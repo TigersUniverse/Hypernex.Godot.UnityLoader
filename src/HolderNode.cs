@@ -20,7 +20,13 @@ namespace Hypernex.GodotVersion.UnityLoader
         [Export]
         public Mesh mesh;
         [Export]
+        public bool shapeEnabled = true;
+        [Export]
+        public bool shapeTrigger = false;
+        [Export]
         public Shape3D shape;
+        [Export]
+        public Vector3 shapeCenter = Vector3.Zero;
         [Export]
         public ushort firstSubmesh = 0;
         [Export]
@@ -80,13 +86,15 @@ namespace Hypernex.GodotVersion.UnityLoader
             }
             if (IsInstanceValid(shape))
             {
-                StaticBody3D body = new StaticBody3D();
+                CollisionObject3D body = shapeTrigger ? new Area3D() : new StaticBody3D();
                 CollisionShape3D collision = new CollisionShape3D();
                 collision.Shape = shape;
                 components.Add(body);
                 AddChild(body);
                 components.Add(collision);
                 body.AddChild(collision);
+                collision.Position = shapeCenter;
+                collision.Disabled = !shapeEnabled;
             }
             if (IsInstanceValid(audioStream))
             {

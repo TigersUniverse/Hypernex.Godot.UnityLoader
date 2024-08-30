@@ -103,7 +103,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                 env.Sky = new Sky();
                 if (skyboxMatInfo.info != null)
                     env.Sky.SkyMaterial = GetSkyMaterial(zippath, mgr, skyboxMatInfo.file, skyboxMatInfo.baseField);
-                // GD.Print(env.Sky.SkyMaterial.ResourceName);
                 var worldEnv = new WorldEnvironment();
                 worldEnv.Environment = env;
                 root.AddChild(worldEnv);
@@ -117,9 +116,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 {
                     if (nodes[j].parentFileId == null || nodes[j].parentFileId == 0)
                     {
-                        // GD.Print(nodes[j].Name);
                         root.AddChild(nodes[j], true);
-                        // nodes[j].Owner = root;
                         nodes.RemoveAt(j);
                         j--;
                     }
@@ -129,7 +126,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                         if (parent != null)
                         {
                             parent.AddChild(nodes[j], true);
-                            // nodes[j].Owner = root;
                             nodes.RemoveAt(j);
                             j--;
                         }
@@ -160,13 +156,6 @@ namespace Hypernex.GodotVersion.UnityLoader
             loadedResources.Add(zippath, new List<Resource>());
             root = new Node3D();
             mgr = new AssetsManager();
-            /*
-            mgr.LoadClassPackage("e:/Apps/uncompressed.tpk");
-            var aFile = mgr.LoadAssetsFile(path);
-            mgr.LoadClassDatabaseFromPackage(aFile.file.Metadata.UnityVersion);
-            ParseAssetsFileInstance(mgr, aFile);
-            */
-            // /*
             try
             {
                 bundleFile = mgr.LoadBundleFile(path, true);
@@ -183,7 +172,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                 mgr.UnloadAll(true);
                 return;
             }
-            // GD.Print(string.Join(" ", bundleFile.file.GetAllFileNames()));
             try
             {
                 List<string> names = bundleFile.file.GetAllFileNames();
@@ -197,7 +185,6 @@ namespace Hypernex.GodotVersion.UnityLoader
             {
                 GD.PrintErr(e);
             }
-            // */
             scene = new PackedScene();
             scene.Pack(root);
             mgr.UnloadAll(true);
@@ -224,7 +211,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                     node.AddChild(comp);
                     comp.Owner = root;
                 }
-                // GD.PrintS(monoScript.baseField["m_Namespace"].AsString, monoScript.baseField["m_ClassName"].AsString);
                 return;
             }
         }
@@ -312,7 +298,23 @@ namespace Hypernex.GodotVersion.UnityLoader
                         mesh = GetMesh(zippath, meshAsset.file, meshAsset.baseField);
                         assets.Add(pathId, mesh);
                     }
-                    node.shape = mesh.CreateTrimeshShape();
+                    if (compBase["m_Convex"].AsBool)
+                        node.shape = mesh.CreateConvexShape();
+                    else
+                        node.shape = mesh.CreateTrimeshShape();
+                    node.shapeCenter = Vector3.Zero;
+                    node.shapeEnabled = compBase["m_Enabled"].AsBool;
+                    node.shapeTrigger = compBase["m_IsTrigger"].AsBool;
+                    break;
+                }
+                case AssetClassID.BoxCollider:
+                {
+                    var box = new BoxShape3D();
+                    box.Size = GetVector3(compBase["m_Size"]).Abs();
+                    node.shape = box;
+                    node.shapeCenter = GetVector3(compBase["m_Center"]);
+                    node.shapeEnabled = compBase["m_Enabled"].AsBool;
+                    node.shapeTrigger = compBase["m_IsTrigger"].AsBool;
                     break;
                 }
                 case AssetClassID.AudioSource:
