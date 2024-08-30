@@ -174,7 +174,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             catch (Exception e)
             {
                 GD.PrintErr(e);
-                mgr.LoadClassPackage("e:/Apps/uncompressed.tpk");
+                mgr.LoadClassPackage("uncompressed.tpk");
                 var aFile = mgr.LoadAssetsFile(path);
                 mgr.LoadClassDatabaseFromPackage(aFile.file.Metadata.UnityVersion);
                 ParseAssetsFileInstance(mgr, aFile);
