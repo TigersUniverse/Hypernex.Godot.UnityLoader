@@ -1,0 +1,19 @@
+<Project Sdk="Godot.NET.Sdk/4.3.0">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Fmod5Sharp" Version="3.0.1" />
+    <PackageReference Include="AssetsTools.NET" Version="3.0.0" />
+    <PackageReference Include="AssetsTools.NET.Texture" Version="1.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Hypernex.Godot\Hypernex.Godot\Hypernex.Godot.csproj" />
+    <Reference Include="Hypernex.CCK">
+      <HintPath>..\Hypernex.Godot\Hypernex.Godot\addons\Hypernex.CCK\Hypernex.CCK.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
