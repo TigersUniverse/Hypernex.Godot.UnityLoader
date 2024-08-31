@@ -82,8 +82,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                 }
                 components.Add(meshInst);
                 AddChild(meshInst);
-                if (subMeshCount != 0)
-                    meshInst.GlobalTransform = Transform3D.Identity;
             }
             if (IsInstanceValid(shape))
             {
@@ -108,15 +106,16 @@ namespace Hypernex.GodotVersion.UnityLoader
                 player.MaxDistance = audioMaxDistance;
                 player.PanningStrength = audioPan;
                 player.Stream = audioStream;
-                // if (autoPlayAudio)
-                    // player.Play();
-                // if (loopAudio)
-                //     player.Finished += () => player.Play();
             }
         }
 
         public override void _Ready()
         {
+            foreach (MeshInstance3D comp in components.Where(x => x is MeshInstance3D))
+            {
+                if (subMeshCount != 0)
+                    comp.GlobalTransform = Transform3D.Identity;
+            }
             foreach (AudioStreamPlayer3D comp in components.Where(x => x is AudioStreamPlayer3D))
             {
                 if (autoPlayAudio)
