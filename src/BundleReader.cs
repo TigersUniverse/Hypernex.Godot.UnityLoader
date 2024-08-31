@@ -664,6 +664,23 @@ namespace Hypernex.GodotVersion.UnityLoader
                         material.Transparency = BaseMaterial3D.TransparencyEnum.AlphaDepthPrePass;
                 }
             }
+            foreach (var flKvp in field["m_SavedProperties.m_Floats.Array"])
+            {
+                var propName = flKvp["first"].AsString;
+                var fl = flKvp["second"].AsFloat;
+                switch (propName)
+                {
+                    case "_Smoothness":
+                        material.Roughness = 1f - fl;
+                        break;
+                    case "_Metallic":
+                        material.Metallic = fl;
+                        break;
+                    case "_SpecularHighlights":
+                        // material.MetallicSpecular = fl;
+                        break;
+                }
+            }
             foreach (var colKvp in field["m_SavedProperties.m_Colors.Array"])
             {
                 var propName = colKvp["first"].AsString;
@@ -713,6 +730,17 @@ namespace Hypernex.GodotVersion.UnityLoader
                         material.AlbedoTexture = texture;
                         material.Uv1Scale = new Vector3(scale.X, scale.Y, 1f);
                         material.Uv1Offset = new Vector3(offset.X, offset.Y, 1f);
+                        break;
+                    case "_MetallicGlossMap":
+                        material.MetallicTexture = texture;
+                        break;
+                    case "_SpecGlossMap":
+                        if (created)
+                        {
+                            var tex = SwapColorsRoughness(texture.GetImage());
+                            texture.Update(tex);
+                        }
+                        material.RoughnessTexture = texture;
                         break;
                     case "_BumpMap":
                     case "_NormalMap":
@@ -947,6 +975,26 @@ namespace Hypernex.GodotVersion.UnityLoader
                 data[i+1] = g;
                 data[i+2] = b;
                 data[i+3] = r;
+            }
+            Image img2 = Image.CreateFromData(img.GetWidth(), img.GetHeight(), true, Image.Format.Rgba8, data);
+            // img2.GenerateMipmaps();
+            return img2;
+        }
+
+        public static Image SwapColorsRoughness(Image img)
+        {
+            // img.ClearMipmaps();
+            byte[] data = img.GetData();
+            for (int i = 0; i < data.Length; i+=4)
+            {
+                byte r = data[i];
+                byte g = data[i+1];
+                byte b = data[i+2];
+                byte a = data[i+3];
+                data[i] = (byte)(byte.MaxValue - r);
+                data[i+1] = g;
+                data[i+2] = b;
+                data[i+3] = a;
             }
             Image img2 = Image.CreateFromData(img.GetWidth(), img.GetHeight(), true, Image.Format.Rgba8, data);
             // img2.GenerateMipmaps();
