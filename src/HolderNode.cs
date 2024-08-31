@@ -34,6 +34,9 @@ namespace Hypernex.GodotVersion.UnityLoader
         public ushort subMeshCount = 0;
         [Export]
         public Array<Material> materials = new Array<Material>();
+        public long? rootBoneFileId = null;
+        [Export]
+        public Array<long> boneFileIds = new Array<long>();
 
         [Export]
         public AudioStream audioStream;
@@ -50,7 +53,7 @@ namespace Hypernex.GodotVersion.UnityLoader
         [Export]
         public float audioPan;
 
-        public void Setup()
+        public void Setup(BundleReader reader)
         {
             if (IsInstanceValid(mesh))
             {
@@ -82,6 +85,36 @@ namespace Hypernex.GodotVersion.UnityLoader
                 }
                 components.Add(meshInst);
                 AddChild(meshInst);
+                if (boneFileIds.Count != 0)
+                {
+                    Skeleton3D skel = new Skeleton3D();
+                    components.Add(skel);
+                    AddChild(skel);
+                    meshInst.Skeleton = meshInst.GetPathTo(skel);
+                    if (rootBoneFileId.HasValue)
+                    {
+                        var rootNode = reader.GetNodeByComponentId(rootBoneFileId.Value);
+                    }
+                    foreach (var id in boneFileIds)
+                    {
+                        var boneNode = reader.GetNodeByComponentId(id);
+                        if (!IsInstanceValid(boneNode))
+                        {
+                            continue;
+                        }
+                        var xform = boneNode.Transform;
+                        int boneIdx = skel.AddBone(boneNode.Name);
+                        var boneParent = reader.GetNodeByComponentId(boneNode.parentFileId.GetValueOrDefault());
+                        if (boneNode.parentFileId.HasValue && IsInstanceValid(boneParent))
+                        {
+                            int idx = skel.FindBone(boneParent.Name);
+                            if (idx != boneIdx)
+                                skel.SetBoneParent(boneIdx, idx);
+                        }
+                        skel.SetBoneRest(boneIdx, xform);
+                        skel.SetBonePose(boneIdx, xform);
+                    }
+                }
             }
             if (IsInstanceValid(shape))
             {
