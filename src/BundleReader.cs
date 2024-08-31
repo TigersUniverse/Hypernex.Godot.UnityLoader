@@ -591,6 +591,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                         stream = AudioStreamOggVorbis.LoadFromBuffer(audioFile);
                         break;
                     case "wav":
+                        GD.PrintErr($"wav: {name}");
                         break;
                     default:
                         return null;
@@ -859,7 +860,6 @@ namespace Hypernex.GodotVersion.UnityLoader
             ArrayMesh mesh = new ArrayMesh();
             mesh.ResourceName = field["m_Name"].AsString;
             loadedResources[zippath].Add(mesh);
-            GD.PrintS(mesh.ResourceName, totalVertexCount, vertexChunkSizeTotal);
             if (totalVertexCount == 0)
                 return mesh;
             int[] streamOffsets = new int[4];
