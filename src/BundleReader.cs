@@ -147,6 +147,14 @@ namespace Hypernex.GodotVersion.UnityLoader
                     ConvertMonoComponent(zippath, node, mgr, componentExtInfo.file, componentPtr, componentExtInfo);
                 }
             }
+            foreach (var node in allNodes)
+            {
+                node.Setup();
+            }
+            foreach (var node in root.FindChildren("*", owned: false))
+            {
+                node.Owner = root;
+            }
         }
 
         public void ReadFile(string path)
@@ -653,7 +661,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     if (val.Equals("Opaque", StringComparison.OrdinalIgnoreCase))
                         material.Transparency = BaseMaterial3D.TransparencyEnum.Disabled;
                     else
-                        material.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+                        material.Transparency = BaseMaterial3D.TransparencyEnum.AlphaDepthPrePass;
                 }
             }
             foreach (var colKvp in field["m_SavedProperties.m_Colors.Array"])

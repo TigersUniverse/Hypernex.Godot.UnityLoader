@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using AssetsTools.NET;
 using Godot;
 using Godot.Collections;
@@ -49,7 +50,7 @@ namespace Hypernex.GodotVersion.UnityLoader
         [Export]
         public float audioPan;
 
-        public override void _Ready()
+        public void Setup()
         {
             if (IsInstanceValid(mesh))
             {
@@ -107,10 +108,21 @@ namespace Hypernex.GodotVersion.UnityLoader
                 player.MaxDistance = audioMaxDistance;
                 player.PanningStrength = audioPan;
                 player.Stream = audioStream;
+                // if (autoPlayAudio)
+                    // player.Play();
+                // if (loopAudio)
+                //     player.Finished += () => player.Play();
+            }
+        }
+
+        public override void _Ready()
+        {
+            foreach (AudioStreamPlayer3D comp in components.Where(x => x is AudioStreamPlayer3D))
+            {
                 if (autoPlayAudio)
-                    player.Play();
+                    comp.Play();
                 if (loopAudio)
-                    player.Finished += () => player.Play();
+                    comp.Finished += () => comp.Play();
             }
         }
     }
