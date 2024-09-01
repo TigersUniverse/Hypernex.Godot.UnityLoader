@@ -37,3 +37,8 @@ Items are listed in no particular order.
 - [x] World Descriptor
 - [ ] Avatar Descriptor
 - [ ] Common Unity Shaders (PoiyomiToonShader)
+
+
+# Disclaimers
+
+This project is not sponsored by or affiliated with Unity Technologies or its affiliates. "Unity" is a registered trademark of Unity Technologies or its affiliates in the U.S. and elsewhere.
