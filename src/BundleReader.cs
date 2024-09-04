@@ -146,6 +146,10 @@ namespace Hypernex.GodotVersion.UnityLoader
             }
             foreach (var node in allNodes)
             {
+                node.Setup(this);
+            }
+            foreach (var node in allNodes)
+            {
                 var goBase = node.assetField;
                 var components = goBase["m_Component.Array"];
                 foreach (var data in components)
@@ -154,10 +158,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                     var componentExtInfo = mgr.GetExtAsset(aFileInst, componentPtr);
                     ConvertMonoComponent(zippath, node, mgr, componentExtInfo.file, componentPtr, componentExtInfo);
                 }
-            }
-            foreach (var node in allNodes)
-            {
-                node.Setup(this);
             }
             foreach (var node in root.FindChildren("*", owned: false))
             {
@@ -574,7 +574,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 case 11:
                     return sizeof(uint);
                 default:
-                    return 0;
+                    throw new InvalidOperationException();
             }
         }
 
@@ -865,7 +865,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 byte stream = vertChannels[i]["stream"].AsByte;
                 byte offset = vertChannels[i]["offset"].AsByte;
                 byte format = vertChannels[i]["format"].AsByte;
-                byte dimension = Math.Clamp(vertChannels[i]["dimension"].AsByte, (byte)0, (byte)4);
+                byte dimension = (byte)(vertChannels[i]["dimension"].AsByte & 0xF);
                 vertexChunkSize[stream] += dimension * GetMeshFormatSize(format);
                 vertexChunkSizeTotal += dimension * GetMeshFormatSize(format);
                 Mesh.ArrayType meshType = GetMeshArrayType(i);
@@ -883,7 +883,12 @@ namespace Hypernex.GodotVersion.UnityLoader
                 rawData = ReadStreamedData(fileInst, field["m_StreamData"], false);
             }
             var data = new byte[totalVertexCount * vertexChunkSizeTotal];
-            Array.Copy(rawData, data, data.Length);
+            // Array.Copy(rawData, data, data.Length);
+            data = rawData;
+            if (fileInst.file.Header.Endianness != BitConverter.IsLittleEndian)
+            {
+                // Array.Reverse(data);
+            }
             var indexData = field["m_IndexBuffer.Array"].AsByteArray;
             var indexFormatSize = field["m_IndexFormat"].AsInt == 0 ? sizeof(ushort) : sizeof(uint);
             var subMeshes = field["m_SubMeshes.Array"];
@@ -894,10 +899,14 @@ namespace Hypernex.GodotVersion.UnityLoader
                 return mesh;
             int[] streamOffsets = new int[4];
             // Array.Fill(streamOffsets, 0);
+            // streamOffsets[i] += 15 & (0 - streamOffsets[i]) is from uvw.js
             streamOffsets[0] = 0; // first will always be at 0
+            streamOffsets[0] += 15 & (0 - streamOffsets[0]);
             streamOffsets[1] = (int)(totalVertexCount * vertexChunkSize[0]);
-            streamOffsets[2] = (int)(totalVertexCount * vertexChunkSize[0] + totalVertexCount * vertexChunkSize[1]);
-            streamOffsets[3] = (int)(totalVertexCount * vertexChunkSize[0] + totalVertexCount * vertexChunkSize[1] + totalVertexCount * vertexChunkSize[2]);
+            streamOffsets[1] += 15 & (0 - streamOffsets[1]);
+            streamOffsets[2] = streamOffsets[1] + (int)(totalVertexCount * vertexChunkSize[1]);
+            streamOffsets[2] += 15 & (0 - streamOffsets[2]);
+            streamOffsets[3] = streamOffsets[2] + (int)(totalVertexCount * vertexChunkSize[2]);
             for (int i = 0; i < subMeshes.AsArray.size; i++)
             {
                 // assuming triangles for simplicity :)
@@ -913,8 +922,12 @@ namespace Hypernex.GodotVersion.UnityLoader
                 var firstVertex = subMeshes[i]["firstVertex"].AsUInt;
                 var vertexCount = subMeshes[i]["vertexCount"].AsUInt;
                 SurfaceTool surface = new SurfaceTool();
+                int skinWeightCount = 0;
                 if (dims.ContainsKey(Mesh.ArrayType.Weights))
-                    surface.SetSkinWeightCount(dims[Mesh.ArrayType.Weights] == 8 ? SurfaceTool.SkinWeightCount.Skin8Weights : SurfaceTool.SkinWeightCount.Skin4Weights);
+                {
+                    skinWeightCount = dims[Mesh.ArrayType.Weights] > 4 ? 8 : 4;
+                    surface.SetSkinWeightCount(dims[Mesh.ArrayType.Weights] > 4 ? SurfaceTool.SkinWeightCount.Skin8Weights : SurfaceTool.SkinWeightCount.Skin4Weights);
+                }
                 surface.Begin(Mesh.PrimitiveType.Triangles);
                 for (uint k = 0; k < indexCount; k++)
                 {
@@ -928,14 +941,15 @@ namespace Hypernex.GodotVersion.UnityLoader
                         surface.AddIndex((int)((long)BitConverter.ToUInt32(indexData, j) + baseVertex - firstVertex));
                     }
                 }
-                // for (uint k = 0; k < totalVertexCount; k++)
                 for (int k = 0; k < vertexCount; k++)
                 {
                     int j = (int)(k + firstVertex);
                     if (offsets.TryGetValue(Mesh.ArrayType.Bones, out int bOffset) && offsets.TryGetValue(Mesh.ArrayType.Weights, out int wOffset))
                     {
-                        surface.SetBones(ReadUInt32ArrayInt(data, streamOffsets[streams[Mesh.ArrayType.Bones]] + j * vertexChunkSize[streams[Mesh.ArrayType.Bones]] + bOffset, dims[Mesh.ArrayType.Weights]));
-                        surface.SetWeights(ReadFloatArray(data, streamOffsets[streams[Mesh.ArrayType.Weights]] + j * vertexChunkSize[streams[Mesh.ArrayType.Weights]] + wOffset, dims[Mesh.ArrayType.Weights]));
+                        var bones = ReadUInt32ArrayInt(data, streamOffsets[streams[Mesh.ArrayType.Bones]] + j * vertexChunkSize[streams[Mesh.ArrayType.Bones]] + bOffset, dims[Mesh.ArrayType.Bones], skinWeightCount);
+                        surface.SetBones(bones);
+                        var weights = ReadFloatArray(data, streamOffsets[streams[Mesh.ArrayType.Weights]] + j * vertexChunkSize[streams[Mesh.ArrayType.Weights]] + wOffset, dims[Mesh.ArrayType.Weights], skinWeightCount);
+                        surface.SetWeights(weights);
                     }
 
                     if (offsets.TryGetValue(Mesh.ArrayType.Normal, out int nOffset))
@@ -955,9 +969,9 @@ namespace Hypernex.GodotVersion.UnityLoader
             return mesh;
         }
 
-        public static int[] ReadUInt32ArrayInt(byte[] data, int offset, int len)
+        public static int[] ReadUInt32ArrayInt(byte[] data, int offset, int len, int fullLen)
         {
-            int[] arr = new int[len];
+            int[] arr = new int[fullLen];
             if (offset + sizeof(uint) * len > data.Length)
                 return arr;
             for (int i = 0; i < len; i++)
@@ -967,9 +981,9 @@ namespace Hypernex.GodotVersion.UnityLoader
             return arr;
         }
 
-        public static float[] ReadFloatArray(byte[] data, int offset, int len)
+        public static float[] ReadFloatArray(byte[] data, int offset, int len, int fullLen)
         {
-            float[] arr = new float[len];
+            float[] arr = new float[fullLen];
             if (offset + sizeof(float) * len > data.Length)
                 return arr;
             for (int i = 0; i < len; i++)

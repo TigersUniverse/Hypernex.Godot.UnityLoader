@@ -125,7 +125,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     // skel.Scale = Vector3.One * Parent.avatarScale;
                     // skel.Basis = Transform.Inverse().Basis;
                     Parent.Setup(reader);
-                    // skel.MotionScale = Parent.avatarScale;
+                    skel.MotionScale = Parent.avatarScale;
                     GD.PrintErr(Name + " " + Parent.avatarScale + " " + avatarScale);
                     // meshInst.Basis = Transform.Basis;//.Scaled(Vector3.One * Parent.avatarScale);
                     // meshInst.Scale = Vector3.One / Parent.avatarScale;
@@ -182,6 +182,9 @@ namespace Hypernex.GodotVersion.UnityLoader
                             //     continue;
                         }
                         var xform = boneNode.Transform;
+                        string bonename = boneNode.Name;
+                        if (Parent.humanBoneAxes.ContainsKey(Parent.GetPathTo(boneNode)))
+                            bonename = Parent.humanBoneAxes[Parent.GetPathTo(boneNode)].humanBoneName;
                         // xform = GetTransformSkeleton(boneNode);
                         int boneIdx = skel.AddBone(boneNode.Name);
                         // skel.SetBoneParent(boneIdx, rootBone);
@@ -213,6 +216,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                         // skel.SetBoneRest(boneIdx, xform.Inverse());
                         if (Parent.humanBoneAxes.ContainsKey(Parent.GetPathTo(boneNode)))
                         {
+                            // skel.SetBoneName(boneIdx, Parent.humanBoneAxes[Parent.GetPathTo(boneNode)].humanBoneName);
                             // boneNode.Transform = Parent.humanBoneAxes[Parent.GetPathTo(boneNode)].xform;
                             // skel.SetBoneRest(boneIdx, Parent.humanBoneAxes[Parent.GetPathTo(boneNode)].xform);
                         }
@@ -241,6 +245,16 @@ namespace Hypernex.GodotVersion.UnityLoader
                     meshInst.ForceUpdateTransform();
                     meshInst.Skeleton = meshInst.GetPathTo(skel);
                     meshInst.Skin = skel.CreateSkinFromRestTransforms();
+                    // skel.SetBonePose(rootBone, Transform3D.Identity);
+                    foreach (var kvp in Parent.humanBoneAxes)
+                    {
+                        var bone = Parent.GetNode<HolderNode>(kvp.Key);
+                        if (kvp.Value.humanBoneName == HumanTrait.BoneName[0])
+                        {
+                            // skel.Scale = Vector3.One * Parent.avatarScale;
+                            // bone.Scale = Vector3.One * Parent.avatarScale;
+                        }
+                    }
                 }
                 else
                 {
@@ -350,7 +364,9 @@ namespace Hypernex.GodotVersion.UnityLoader
                     int par = skel.GetBoneParent(kvp.Value);
                     var xform = node.Transform;
                     // skel.SetBonePose(kvp.Value, xform);
-                    skel.SetBoneGlobalPose(kvp.Value, skel.GlobalTransform.Inverse() * node.GlobalTransform);
+                    var gxform = skel.GlobalTransform.Inverse() * node.GlobalTransform;
+                    // gxform.Basis = gxform.Basis.Scaled(Vector3.One / gxform.Basis.Scale);
+                    skel.SetBoneGlobalPose(kvp.Value, gxform);
                     // GetNode<HolderNode>(kvp.Key).Transform = skel.GetBonePose(kvp.Value);
                     // skel.SetBonePosePosition(kvp.Value, xform.Origin);
                     // skel.SetBonePoseRotation(kvp.Value, xform.Basis.GetRotationQuaternion());

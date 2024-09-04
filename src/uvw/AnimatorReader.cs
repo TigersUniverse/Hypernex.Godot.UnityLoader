@@ -28,7 +28,36 @@ namespace Hypernex.GodotVersion.UnityLoader
             {
                 hashToNode.Add(kvp.Key, GetNodeByTransformComponentId(kvp.Value));
             }
+            foreach (var item in avatarAsset.baseField["m_TOS.Array"])
+            {
+                var first = item["first"].AsUInt;
+                var second = item["second"].AsString;
+                var path = string.Join("/", second.Split("/").Select(x => x.ValidateNodeName()));
+                hashToNode.TryAdd(first, node.GetNode<HolderNode>(path));
+            }
             AnimationPlayer player = new AnimationPlayer();
+            AnimationLibrary library = GetAnimationLibrary(ctrlAsset, hashToNode, node);
+            Error err = player.AddAnimationLibrary(string.Empty, library);
+            if (err != Error.Ok)
+                GD.PrintErr(err);
+            ParseHumanAvatarData(avatarAsset, hashToNode, node);
+            return player;
+        }
+
+        public AnimationLibrary GetAnimationLibraryNoLookup(AssetExternal ctrlAsset, HolderNode node)
+        {
+            Dictionary<HashNum, long> hashToXform = new Dictionary<HashNum, long>();
+            BuildTOS(hashToXform, node.assetTransformField);
+            Dictionary<HashNum, HolderNode> hashToNode = new Dictionary<HashNum, HolderNode>();
+            foreach (var kvp in hashToXform)
+            {
+                hashToNode.Add(kvp.Key, GetNodeByTransformComponentId(kvp.Value));
+            }
+            return GetAnimationLibrary(ctrlAsset, hashToNode, node);
+        }
+
+        public AnimationLibrary GetAnimationLibrary(AssetExternal ctrlAsset, Dictionary<HashNum, HolderNode> hashToNode, HolderNode node)
+        {
             AnimationLibrary library = new AnimationLibrary();
             foreach (var clipPtr in ctrlAsset.baseField["m_AnimationClips.Array"])
             {
@@ -37,13 +66,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                     continue;
                 Animation anim = GetAnimation(hashToNode, clipAsset, node);
                 library.AddAnimation(anim.ResourceName, anim);
-                // GD.PrintS("Clip found:", anim.ResourceName);
             }
-            Error err = player.AddAnimationLibrary(string.Empty, library);
-            if (err != Error.Ok)
-                GD.PrintErr(err);
-            ParseHumanAvatarData(avatarAsset, hashToNode, node);
-            return player;
+            return library;
         }
 
         public void ParseHumanAvatarData(AssetExternal avatarAsset, Dictionary<HashNum, HolderNode> hashToNode, HolderNode node)
