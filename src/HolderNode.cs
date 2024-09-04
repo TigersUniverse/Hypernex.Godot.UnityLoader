@@ -313,7 +313,8 @@ namespace Hypernex.GodotVersion.UnityLoader
             var anim = GetComponent<AnimationPlayer>();
             if (IsInstanceValid(anim))
                 anim.Play(anim.GetAnimationList().First());
-                
+
+            /*
             var im = new MeshInstance3D();
             im.Mesh = new SphereMesh()
             {
@@ -322,6 +323,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             };
             AddChild(im);
             im.GlobalBasis = Basis.Identity;
+            */
         }
 
         public override void _Process(double delta)
