@@ -26,6 +26,11 @@ namespace Hypernex.GodotVersion.UnityLoader
         public AssetsManager mgr;
         public BundleFileInstance bundleFile;
 
+        [ThreadStatic]
+        public static bool flipZ = true;
+
+        public static float zFlipper => flipZ ? -1f : 1f;
+
         public struct AssetInfo
         {
             public int fileId;
@@ -65,6 +70,7 @@ namespace Hypernex.GodotVersion.UnityLoader
         {
             scene = null;
             ReadFile(filePath);
+            ResourceSaver.Save(scene, "user://scene.tscn", ResourceSaver.SaverFlags.BundleResources);
             return scene;
         }
 
@@ -84,7 +90,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 node.assetField = goBase;
                 node.Visible = goBase["m_IsActive"].AsBool;
                 node.ProcessMode = node.Visible ? Node.ProcessModeEnum.Inherit : Node.ProcessModeEnum.Disabled;
-                node.Name = name;
+                node.Name = name.ValidateNodeName();
                 foreach (var data in components)
                 {
                     var componentPtr = data["component"];
@@ -165,6 +171,10 @@ namespace Hypernex.GodotVersion.UnityLoader
             Unload();
             loadedResources.Add(zippath, new List<Resource>());
             root = new Node3D();
+            if (!flipZ)
+            {
+                root.Basis = Basis.FlipZ;
+            }
             mgr = new AssetsManager();
             try
             {
@@ -205,7 +215,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             return allNodes.FirstOrDefault(x => x.Owner == root && x.gameObjectFileId == id);
         }
 
-        public HolderNode GetNodeByComponentId(long id)
+        public HolderNode GetNodeByTransformComponentId(long id)
         {
             return allNodes.FirstOrDefault(x => x.Owner == root && x.fileId == id);
         }
@@ -238,17 +248,23 @@ namespace Hypernex.GodotVersion.UnityLoader
             {
                 case AssetClassID.Transform:
                 {
+                    node.assetTransformField = componentExtInfo;
                     node.fileId = componentPtr["m_PathID"].AsLong;
                     node.gameObjectFileId = compBase["m_GameObject"]["m_PathID"].AsLong;
                     var ptr = compBase["m_Father"]["m_PathID"];
                     node.parentFileId = ptr.IsDummy ? null : ptr.AsLong;
                     var position = GetVector3(compBase["m_LocalPosition"]);
                     var rotation = GetQuaternion(compBase["m_LocalRotation"]);
-                    var scale = GetVector3(compBase["m_LocalScale"]) * new Vector3(1f, 1f, -1f);
-                    // node.Transform = new Transform3D(new Basis(rotation).Scaled(scale), position);
+                    var scale = GetVector3NoFlip(compBase["m_LocalScale"]);
+                    // node.Transform = new Transform3D(new Basis(rotation).Scaled(scale), position).ScaledLocal(new Vector3(1f, 1f, zFlipper));
                     node.Position = position;
                     node.Quaternion = rotation;
                     node.Scale = scale;
+                    break;
+                }
+                case AssetClassID.Animator:
+                {
+                    node.assetAnimatorField = componentExtInfo;
                     break;
                 }
                 case AssetClassID.MeshFilter:
@@ -374,7 +390,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 case AssetClassID.BoxCollider:
                 {
                     var box = new BoxShape3D();
-                    box.Size = GetVector3(compBase["m_Size"]).Abs();
+                    box.Size = GetVector3NoFlip(compBase["m_Size"]);
                     node.shape = box;
                     node.shapeCenter = GetVector3(compBase["m_Center"]);
                     node.shapeEnabled = compBase["m_Enabled"].AsBool;
@@ -487,14 +503,26 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public static Vector3 GetVector3(AssetTypeValueField field)
         {
-            // return new Vector3(field["x"].AsFloat, field["y"].AsFloat, field["z"].AsFloat);
+            if (!flipZ)
+                return new Vector3(field["x"].AsFloat, field["y"].AsFloat, field["z"].AsFloat);
             return new Vector3(field["x"].AsFloat, field["y"].AsFloat, -field["z"].AsFloat);
+        }
+
+        public static Vector3 GetVector3NoFlip(AssetTypeValueField field)
+        {
+            return new Vector3(field["x"].AsFloat, field["y"].AsFloat, field["z"].AsFloat);
         }
 
         public static Quaternion GetQuaternion(AssetTypeValueField field)
         {
-            // return new Quaternion(field["x"].AsFloat, field["y"].AsFloat, field["z"].AsFloat, field["w"].AsFloat);
+            if (!flipZ)
+                return new Quaternion(field["x"].AsFloat, field["y"].AsFloat, field["z"].AsFloat, field["w"].AsFloat);
             return new Quaternion(field["x"].AsFloat, field["y"].AsFloat, -field["z"].AsFloat, -field["w"].AsFloat);
+        }
+
+        public static Quaternion GetQuaternionNoFlip(AssetTypeValueField field)
+        {
+            return new Quaternion(field["x"].AsFloat, field["y"].AsFloat, field["z"].AsFloat, field["w"].AsFloat);
         }
 
         public static Mesh.ArrayType GetMeshArrayType(int input)
@@ -713,6 +741,8 @@ namespace Hypernex.GodotVersion.UnityLoader
             material.ResourceName = field["m_Name"].AsString;
             loadedResources[zippath].Add(material);
             material.VertexColorUseAsAlbedo = true;
+            if (!flipZ)
+                material.CullMode = BaseMaterial3D.CullModeEnum.Disabled; // debug
             foreach (var tagMap in field["stringTagMap.Array"])
             {
                 string key = tagMap["first"].AsString;
@@ -978,7 +1008,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                 float x = (float)BitConverter.ToHalf(data, offset + sizeof(float) / 2 * 0);
                 float y = (float)BitConverter.ToHalf(data, offset + sizeof(float) / 2 * 1);
                 float z = (float)BitConverter.ToHalf(data, offset + sizeof(float) / 2 * 2);
-                // return new Vector3(x, y, z);
+                if (!flipZ)
+                    return new Vector3(x, y, z);
                 return new Vector3(x, y, -z);
             }
             else
@@ -988,7 +1019,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                 float x = BitConverter.ToSingle(data, offset + sizeof(float) * 0);
                 float y = BitConverter.ToSingle(data, offset + sizeof(float) * 1);
                 float z = BitConverter.ToSingle(data, offset + sizeof(float) * 2);
-                // return new Vector3(x, y, z);
+                if (!flipZ)
+                    return new Vector3(x, y, z);
                 return new Vector3(x, y, -z);
             }
         }
@@ -1003,7 +1035,8 @@ namespace Hypernex.GodotVersion.UnityLoader
             float y = BitConverter.ToSingle(data, offset + sizeof(float) * 1);
             float z = BitConverter.ToSingle(data, offset + sizeof(float) * 2);
             float w = BitConverter.ToSingle(data, offset + sizeof(float) * 3);
-            // return new Vector4(x, y, z, w);
+            if (!flipZ)
+                return new Vector4(x, y, z, w);
             return new Vector4(x, y, -z, w);
         }
 
@@ -1030,7 +1063,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                 float y = (float)BitConverter.ToHalf(data, offset + sizeof(float) / 2 * 1);
                 float z = (float)BitConverter.ToHalf(data, offset + sizeof(float) / 2 * 2);
                 float w = (float)BitConverter.ToHalf(data, offset + sizeof(float) / 2 * 3);
-                // return new Plane(x, y, z, w);
+                if (!flipZ)
+                    return new Plane(x, y, z, w);
                 return new Plane(x, y, -z, w);
             }
             else
@@ -1041,7 +1075,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                 float y = BitConverter.ToSingle(data, offset + sizeof(float) * 1);
                 float z = BitConverter.ToSingle(data, offset + sizeof(float) * 2);
                 float w = BitConverter.ToSingle(data, offset + sizeof(float) * 3);
-                // return new Plane(x, y, z, w);
+                if (!flipZ)
+                    return new Plane(x, y, z, w);
                 return new Plane(x, y, -z, w);
             }
         }

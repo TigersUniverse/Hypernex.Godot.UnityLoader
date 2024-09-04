@@ -17,6 +17,7 @@ namespace Hypernex.GodotVersion.UnityLoader
         public override void OnPluginLoaded()
         {
             Init.WorldProvider = UnitySceneProvider;
+            Init.AvatarProvider = UnitySceneProvider;
         }
 
         public ISceneProvider UnitySceneProvider()

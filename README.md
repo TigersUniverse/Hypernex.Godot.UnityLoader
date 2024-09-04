@@ -39,6 +39,12 @@ Items are listed in no particular order.
 - [ ] Common Unity Shaders (PoiyomiToonShader)
 
 
+# License
+
+The `src/uvw` folder is licened under the Apache-2.0 License. The rest of the code is under the MIT license.
+
+`src/uvw` is heavily based off https://gitlab.com/lox9973/uvw.js
+
 # Disclaimers
 
 This project is not sponsored by or affiliated with Unity Technologies or its affiliates. "Unity" is a registered trademark of Unity Technologies or its affiliates in the U.S. and elsewhere.
