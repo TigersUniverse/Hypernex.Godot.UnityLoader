@@ -18,8 +18,8 @@ Items are listed in no particular order.
 - [x] Textures/Images
 - [x] Standard Builtin/URP Materials (partial)
 - [ ] Terrain
-- [ ] Skinned Meshes and Renderers
-- [ ] Animators
+- [ ] Skinned Meshes and Renderers (in-progress)
+- [ ] Animators (in-progress)
 - [x] Sound Assets (partial)
 - [ ] Sound Filters
 - [ ] Sound Areas
