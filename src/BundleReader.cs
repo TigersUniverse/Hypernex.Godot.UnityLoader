@@ -26,7 +26,6 @@ namespace Hypernex.GodotVersion.UnityLoader
         public AssetsManager mgr;
         public BundleFileInstance bundleFile;
 
-        [ThreadStatic]
         public static bool flipZ = true;
 
         public static float zFlipper => flipZ ? -1f : 1f;
@@ -70,7 +69,7 @@ namespace Hypernex.GodotVersion.UnityLoader
         {
             scene = null;
             ReadFile(filePath);
-            ResourceSaver.Save(scene, "user://scene.tscn", ResourceSaver.SaverFlags.BundleResources);
+            // ResourceSaver.Save(scene, "res://temp/scene.scn", ResourceSaver.SaverFlags.BundleResources);
             return scene;
         }
 
@@ -882,9 +881,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             {
                 rawData = ReadStreamedData(fileInst, field["m_StreamData"], false);
             }
-            var data = new byte[totalVertexCount * vertexChunkSizeTotal];
-            // Array.Copy(rawData, data, data.Length);
-            data = rawData;
+            byte[] data = rawData;
             if (fileInst.file.Header.Endianness != BitConverter.IsLittleEndian)
             {
                 // Array.Reverse(data);

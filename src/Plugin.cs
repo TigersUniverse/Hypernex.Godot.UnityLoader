@@ -41,23 +41,21 @@ namespace Hypernex.GodotVersion.UnityLoader
                     }
                     case "Hypernex.CCK.Unity.Avatar":
                     {
-                        // var avi = new AvatarDescriptor();
+                        var avi = new AvatarDescriptor();
                         foreach (var anims in component["Animators.Array"])
                         {
                             var animCtrl = manager.GetExtAsset(fileInst, anims["AnimatorController"]);
                             if (animCtrl.info == null)
                                 continue;
-                            var library = reader.GetAnimationLibraryNoLookup(animCtrl, node);
+                            var library = reader.GetAnimationLibraryUseExistingTOS(animCtrl, node);
                             if (node.GetComponent<AnimationPlayer>() != null)
                             {
                                 node.GetComponent<AnimationPlayer>().AddAnimationLibrary(animCtrl.baseField["m_Name"].AsString, library);
                             }
-                            // GD.Print(animCtrl.baseField["m_Name"].AsString);
                         }
                         // avi.Skeleton = "../" + node.GetPathTo(node.GetComponent<Skeleton3D>());
-                        // GD.PrintErr(avi.Skeleton);
                         return null;
-                        // return avi;
+                        return avi;
                     }
                 }
                 return null;

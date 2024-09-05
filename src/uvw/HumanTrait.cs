@@ -298,7 +298,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 var localQ = preQ.Normalized() * SwingTwist(x * weightReal, y, z).Normalized() * invPostQ;
                 // var localQ = preQ.Normalized() * Quaternion.FromEuler(new Vector3(x, y, z) * weightReal) * invPostQ;
                 bone.Quaternion = FlipZ(localQ).Normalized();
-                // bone.Basis = new Basis(FlipZ(localQ).Normalized());// * Basis.FlipZ;//.Scaled(new Vector3(1f, 1f, -1f));
+                // bone.Basis = new Basis(FlipZ(localQ)).Orthonormalized();// * Basis.FlipZ;//.Scaled(new Vector3(1f, 1f, -1f));
                 // GD.PrintS(node.GetPath(), hName, new Vector3(x, y, z) * (180f / Mathf.Pi), SwingTwist(x * weightReal, y, z).GetEuler() * (180f / Mathf.Pi));
             }
         }

@@ -41,6 +41,8 @@ namespace Hypernex.GodotVersion.UnityLoader
         public Array<Material> materials = new Array<Material>();
         public long? rootBoneFileId = null;
         [Export]
+        public int rootBoneIndex = -1;
+        [Export]
         public Array<long> boneFileIds = new Array<long>();
         [Export]
         public Dictionary<NodePath, int> skeletonBoneMap = new Dictionary<NodePath, int>();
@@ -71,15 +73,69 @@ namespace Hypernex.GodotVersion.UnityLoader
         [Export]
         public float avatarScale = 1f;
 
-        public HolderNode Parent => GetParent<HolderNode>();
+        public HolderNode Parent => GetParentOrNull<HolderNode>();
 
-        public Transform3D GetTransformSkeleton(HolderNode node)
+        public void GetTransformPath(Node3D src, NodePath path, Array<Transform3D> xforms)
         {
-            if (node.GetParent() is not HolderNode)
-                return Transform3D.Identity;
-            if (node.Parent == this)
-                return Transform3D.Identity;
-            return node.Transform * GetTransformSkeleton(node.Parent);
+            if (path.GetNameCount() <= 0)
+                return;
+            string part = path.GetName(0);
+            var n = src.GetNodeOrNull<Node3D>(part);
+            if (IsInstanceValid(n) && path.GetNameCount() > 1)
+            {
+                if (n.IsAncestorOf(src))
+                    xforms.Add(src.Transform.AffineInverse());
+                else
+                    xforms.Add(src.Transform);
+                string[] paths = new string[path.GetNameCount() - 1];
+                for (int i = 0; i < paths.Length; i++)
+                {
+                    paths[i] = path.GetName(i+1);
+                }
+                string path2 = string.Join('/', paths);
+                GetTransformPath(n, path2, xforms);
+            }
+            // else
+            //     xforms.Add(src.Transform.AffineInverse());
+        }
+
+        public void GetTransformGlobal(Node3D src, Array<Transform3D> xforms)
+        {
+            xforms.Add(src.Transform);
+            var n = src.GetParentOrNull<Node3D>();
+            if (IsInstanceValid(n))
+            {
+                GetTransformGlobal(n, xforms);
+            }
+        }
+
+        public Transform3D GetTransformGlobal(Node3D src)
+        {
+            // A
+            // B
+            // C
+            var xforms = new Array<Transform3D>();
+            GetTransformGlobal(src, xforms);
+            // xforms.Reverse();
+            Transform3D ret = xforms[0];
+            for (int i = 1; i < xforms.Count; i++)
+            {
+                ret = xforms[i] * ret;
+            }
+            return ret;
+        }
+
+        public Transform3D GetTransformPath(Node3D src, Node3D dst)
+        {
+            var xforms = new Array<Transform3D>();
+            GetTransformPath(src, src.GetPathTo(dst), xforms);
+            xforms.Reverse();
+            Transform3D ret = Transform3D.Identity;
+            for (int i = 0; i < xforms.Count; i++)
+            {
+                ret = xforms[i] * ret;
+            }
+            return ret;
         }
 
         public void Setup(BundleReader reader)
@@ -120,74 +176,65 @@ namespace Hypernex.GodotVersion.UnityLoader
                 {
                     Skeleton3D skel = new Skeleton3D();
                     components.Add(skel);
-                    AddChild(skel);
-                    skel.AddChild(meshInst);
-                    // skel.Scale = Vector3.One * Parent.avatarScale;
-                    // skel.Basis = Transform.Inverse().Basis;
+                    // AddChild(skel, true);
+                    // skel.AddChild(meshInst, true);
                     Parent.Setup(reader);
                     skel.MotionScale = Parent.avatarScale;
-                    GD.PrintErr(Name + " " + Parent.avatarScale + " " + avatarScale);
-                    // meshInst.Basis = Transform.Basis;//.Scaled(Vector3.One * Parent.avatarScale);
-                    // meshInst.Scale = Vector3.One / Parent.avatarScale;
+                    // skel.AddBone("Root");
                     int rootBone = -1;
                     Axes rootAxes = null;
                     foreach (var kvp in Parent.humanBoneAxes)
                     {
                         var bone = Parent.GetNode<HolderNode>(kvp.Key);
-                        // bone.Transform = kvp.Value.xform;
-                        if (kvp.Value.humanBoneName == HumanTrait.BoneName[0])
+                        if (IsInstanceValid(bone) && kvp.Value.humanBoneName == HumanTrait.BoneName[0])
                         {
                             rootAxes = kvp.Value;
-                            var rot = kvp.Value.rotation;
-                            rot = Quaternion.Identity;
-                            // bone.Basis = bone.Basis.Scaled(new Vector3(1f, 1f, -1f) * kvp.Value.scale);
-                            bone.ForceUpdateTransform();
-                            skel.ForceUpdateTransform();
-                            meshInst.ForceUpdateTransform();
+                            break;
                         }
                     }
-
-                    skeletonBoneMap.Clear();
+                    var scl = Transform3D.Identity;
                     if (rootBoneFileId.HasValue)
                     {
-                        var rootNode = reader.GetNodeByTransformComponentId(rootBoneFileId.Value);
-                        // int boneIdx = skel.AddBone(rootNode.Name);
-                        var path = Parent.GetPathTo(rootNode);
-                        GD.PrintS("Root", path);
-                        // rootNode.Scale *= Vector3.One * Parent.avatarScale;
-                        // rootNode.ForceUpdateTransform();
-                        // skeletonBoneMap.Add(path, boneIdx);
-                        if (Parent.humanBoneAxes.ContainsKey(path))
+                        var boneNode = reader.GetNodeByTransformComponentId(rootBoneFileId.Value).Parent;
+                        if (IsInstanceValid(boneNode))
                         {
-                            // rootNode.Transform = Parent.humanBoneAxes[path].xform;
-                            GD.PrintS("Root", Parent.humanBoneAxes[path].scale);
+                            // scl = boneNode.Transform;
                         }
-                        // skel.Reparent(rootNode);
                     }
+                    if (IsInstanceValid(rootAxes))
+                        meshInst.Scale = Vector3.One / rootAxes.scale;
+                    // skel.SetBoneRest(0, scl.Scaled(Vector3.One / Scale));
+                    /*
+                    // Scale = Vector3.One;
+                    // Transform = Transform3D.Identity;
+                    // meshInst.Basis = Basis;
+                    if (IsInstanceValid(rootAxes))
+                    {
+                        // Transform = rootAxes.xform;
+                        meshInst.Transform = rootAxes.xform.Inverse();
+                        skel.Transform = rootAxes.xform;
+                        // Basis = Basis.Identity;
+                        // meshInst.Transform = Transform3D.Identity;
+                    }
+                    skel.Scale = Vector3.One / scl;
+                    meshInst.Scale = scl;
+                    */
+
+                    skeletonBoneMap.Clear();
                     foreach (var id in boneFileIds)
                     {
-                        // if (rootBoneFileId.HasValue && id == rootBoneFileId.Value)
-                        //     continue;
                         var boneNode = reader.GetNodeByTransformComponentId(id);
                         if (!IsInstanceValid(boneNode))
                         {
                             continue;
                         }
-                        var path2 = Parent.GetPathTo(boneNode);
-                        if (Parent.humanBoneAxes.ContainsKey(path2))
-                        {
-                            // if (Parent.humanBoneAxes[path2].humanBoneName == HumanTrait.BoneName[0])
-                            //     continue;
-                            // if (Parent.humanBoneAxes[path2].humanBoneName == HumanTrait.BoneName[7])
-                            //     continue;
-                        }
+                        // if (rootBoneFileId.HasValue && !reader.GetNodeByTransformComponentId(rootBoneFileId.Value).IsAncestorOf(boneNode) && reader.GetNodeByTransformComponentId(rootBoneFileId.Value) != boneNode)
+                        //     continue;
                         var xform = boneNode.Transform;
                         string bonename = boneNode.Name;
                         if (Parent.humanBoneAxes.ContainsKey(Parent.GetPathTo(boneNode)))
                             bonename = Parent.humanBoneAxes[Parent.GetPathTo(boneNode)].humanBoneName;
-                        // xform = GetTransformSkeleton(boneNode);
                         int boneIdx = skel.AddBone(boneNode.Name);
-                        // skel.SetBoneParent(boneIdx, rootBone);
                         var path = GetPathTo(boneNode);
                         skeletonBoneMap.Add(path, boneIdx);
                         var boneParent = reader.GetNodeByTransformComponentId(boneNode.parentFileId.GetValueOrDefault());
@@ -197,64 +244,39 @@ namespace Hypernex.GodotVersion.UnityLoader
                             if (idx != boneIdx)
                             {
                                 // if (idx == -1)
-                                //     idx = rootBone;
+                                //     idx = 0;
                                 skel.SetBoneParent(boneIdx, idx);
                             }
                         }
-                        // GD.Print($"{skel.GetBoneName(boneIdx)} {skel.GetBoneParent(boneIdx)}");
-                        // xform.Origin *= Vector3.One * Parent.avatarScale;
                         if (rootBoneFileId.HasValue && id == rootBoneFileId.Value)
                         {
+                            // if (IsInstanceValid(rootAxes))
+                            //     xform = rootAxes.xform * xform;
+                            // xform = Transform3D.Identity;
+                            xform = GetTransformGlobal(this).AffineInverse() * GetTransformGlobal(boneNode);
                             if (IsInstanceValid(rootAxes))
-                                xform = rootAxes.xform;
+                                xform = xform.Scaled(rootAxes.scale);
+                            // if (IsInstanceValid(rootAxes))
+                            //     xform = GetTransformGlobal(boneNode) * rootAxes.xform;
+                            //     xform = rootAxes.xform.AffineInverse() * GetTransformGlobal(boneNode);
+                            // xform = xform.Scaled(Vector3.One / Scale);
+                            // xform = GlobalTransform.AffineInverse() * xform;
+                            // xform = GetTransformPath(boneNode, this);// * boneNode.Transform.AffineInverse();
+                            // xform = Transform.AffineInverse() * xform;
                             rootBone = boneIdx;
-                            // skel.SetBoneEnabled(boneIdx, false);
-                            // continue;
+                            skel.SetBoneEnabled(boneIdx, false);
                         }
+                        // xform = xform.Scaled(Vector3.One / xform.Basis.Scale);
                         skel.SetBoneRest(boneIdx, xform);
-                        // skel.SetBoneRest(boneIdx, Transform3D.Identity);
-                        // skel.SetBoneRest(boneIdx, xform.Inverse());
-                        if (Parent.humanBoneAxes.ContainsKey(Parent.GetPathTo(boneNode)))
-                        {
-                            // skel.SetBoneName(boneIdx, Parent.humanBoneAxes[Parent.GetPathTo(boneNode)].humanBoneName);
-                            // boneNode.Transform = Parent.humanBoneAxes[Parent.GetPathTo(boneNode)].xform;
-                            // skel.SetBoneRest(boneIdx, Parent.humanBoneAxes[Parent.GetPathTo(boneNode)].xform);
-                        }
-                        else
-                        {
-                            // GD.PrintErr(Parent.GetPathTo(boneNode));
-                        }
-                        // skel.SetBonePose(boneIdx, xform);
-                        /*
-                        var bone = new BoneAttachment3D();
-                        boneNode.AddChild(bone);
-                        bone.SetUseExternalSkeleton(true);
-                        bone.SetExternalSkeleton(bone.GetPathTo(skel));
-                        bone.BoneIdx = boneIdx;
-                        bone.Transform = xform;
-                        bone.OverridePose = true;
-                        */
+                        skel.SetBonePose(boneIdx, xform);
                     }
-                    // GD.PrintErr(string.Join(", ", Parent.humanBoneAxes.Keys));
-                    // skel.ResetBonePoses();
-                    // skel.LocalizeRests();
-                    // skel.ForceUpdateAllBoneTransforms();
-                    for (int i = 0; i < skel.GetBoneCount(); i++)
-                        skel.ForceUpdateBoneChildTransform(i);
-                    skel.ForceUpdateTransform();
-                    meshInst.ForceUpdateTransform();
-                    meshInst.Skeleton = meshInst.GetPathTo(skel);
+                    rootBoneIndex = rootBone;
+
+                    AddChild(skel, true);
+                    skel.AddChild(meshInst, true);
                     meshInst.Skin = skel.CreateSkinFromRestTransforms();
-                    // skel.SetBonePose(rootBone, Transform3D.Identity);
-                    foreach (var kvp in Parent.humanBoneAxes)
-                    {
-                        var bone = Parent.GetNode<HolderNode>(kvp.Key);
-                        if (kvp.Value.humanBoneName == HumanTrait.BoneName[0])
-                        {
-                            // skel.Scale = Vector3.One * Parent.avatarScale;
-                            // bone.Scale = Vector3.One * Parent.avatarScale;
-                        }
-                    }
+                    meshInst.Skeleton = meshInst.GetPathTo(skel);
+                    // skel.ShowRestOnly = true; // debug
                 }
                 else
                 {
@@ -292,6 +314,29 @@ namespace Hypernex.GodotVersion.UnityLoader
                 AnimationPlayer tree = reader.GetAnimPlayer(assetAnimatorField.file, assetAnimatorField.baseField, this);
                 components.Add(tree);
                 AddChild(tree);
+                /*
+                Skeleton3D skel = new Skeleton3D();
+                Dictionary<HolderNode, int> indexes = new Dictionary<HolderNode, int>();
+                foreach (var boneKvp in hashToNode)
+                {
+                    if (!IsInstanceValid(boneKvp.Value))
+                        continue;
+                    int idx = skel.AddBone(boneKvp.Value.Name + "_" + GetPathTo(boneKvp.Value).GetNameCount());
+                    indexes.Add(boneKvp.Value, idx);
+                    if (IsInstanceValid(boneKvp.Value.Parent) && indexes.ContainsKey(boneKvp.Value.Parent))
+                        skel.SetBoneParent(idx, indexes[boneKvp.Value.Parent]);
+                }
+                foreach (var kvp in humanBoneAxes)
+                {
+                    var bone = GetNode<HolderNode>(kvp.Key);
+                    if (indexes.ContainsKey(bone) && !string.IsNullOrEmpty(kvp.Value.humanBoneName))
+                    {
+                        skel.SetBoneName(indexes[bone], kvp.Value.humanBoneName);
+                    }
+                }
+                components.Add(skel);
+                AddChild(skel);
+                */
             }
         }
 
@@ -308,6 +353,13 @@ namespace Hypernex.GodotVersion.UnityLoader
         public HolderNode FindChildTransform(string name, string parentName)
         {
             return FindChildren("*", owned: false).FirstOrDefault(x => x is HolderNode && x.Name == name.ValidateNodeName() && x.GetParent().Name == parentName.ValidateNodeName()) as HolderNode;
+        }
+
+        public override void _EnterTree()
+        {
+            var skel = GetComponent<Skeleton3D>();
+            // if (IsInstanceValid(skel))
+            //     skel.ResetBonePoses();
         }
 
         public override void _Ready()
@@ -328,7 +380,10 @@ namespace Hypernex.GodotVersion.UnityLoader
             if (IsInstanceValid(anim))
                 anim.Play(anim.GetAnimationList().First());
 
-            /*
+            GD.PrintS(GlobalTransform.Origin, GetTransformGlobal(this).Origin);
+
+            return;
+            // /*
             var im = new MeshInstance3D();
             im.Mesh = new SphereMesh()
             {
@@ -337,7 +392,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             };
             AddChild(im);
             im.GlobalBasis = Basis.Identity;
-            */
+            // */
         }
 
         public override void _Process(double delta)
@@ -356,22 +411,41 @@ namespace Hypernex.GodotVersion.UnityLoader
             }
             if (IsInstanceValid(skel))
             {
-                // skel.ResetBonePoses();
-                foreach (var kvp in skeletonBoneMap)
+                if (IsInstanceValid(anim))
                 {
-                    // break;
-                    var node = GetNode<HolderNode>(kvp.Key);
-                    int par = skel.GetBoneParent(kvp.Value);
-                    var xform = node.Transform;
-                    // skel.SetBonePose(kvp.Value, xform);
-                    var gxform = skel.GlobalTransform.Inverse() * node.GlobalTransform;
-                    // gxform.Basis = gxform.Basis.Scaled(Vector3.One / gxform.Basis.Scale);
-                    skel.SetBoneGlobalPose(kvp.Value, gxform);
-                    // GetNode<HolderNode>(kvp.Key).Transform = skel.GetBonePose(kvp.Value);
-                    // skel.SetBonePosePosition(kvp.Value, xform.Origin);
-                    // skel.SetBonePoseRotation(kvp.Value, xform.Basis.GetRotationQuaternion());
+                    // for (int i = 0; i < skel.GetBoneCount(); i++)
+                    {
+                        // var gxform = skel.GlobalTransform * skel.GetBoneGlobalPose(i);
+                        foreach (var kvp in humanBoneAxes)
+                        {
+                            break;
+                            var bone = GetNode<HolderNode>(kvp.Key);
+                            int idx = skel.FindBone(kvp.Value.humanBoneName);
+                            if (idx != -1)
+                            {
+                                var xform = skel.GetBonePose(idx);
+                                bone.Transform = xform;
+                                // var gxform = skel.GlobalTransform * skel.GetBoneGlobalPose(idx);
+                                // bone.GlobalTransform = gxform;
+                            }
+                        }
+                    }
                 }
-                // skel.ResetBonePoses();
+                else
+                {
+                    // skel.ResetBonePoses();
+                    foreach (var kvp in skeletonBoneMap)
+                    {
+                        // break;
+                        var node = GetNode<HolderNode>(kvp.Key);
+                        int par = skel.GetBoneParent(kvp.Value);
+                        var xform = node.Transform;
+                        skel.SetBonePose(kvp.Value, xform);
+                        var gxform = skel.GlobalTransform.Inverse() * node.GlobalTransform;
+                        // skel.SetBoneGlobalPose(kvp.Value, gxform);
+                    }
+                    // skel.ResetBonePoses();
+                }
             }
         }
     }

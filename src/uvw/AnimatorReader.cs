@@ -26,14 +26,18 @@ namespace Hypernex.GodotVersion.UnityLoader
             Dictionary<HashNum, HolderNode> hashToNode = new Dictionary<HashNum, HolderNode>();
             foreach (var kvp in hashToXform)
             {
-                hashToNode.Add(kvp.Key, GetNodeByTransformComponentId(kvp.Value));
+                var target = GetNodeByTransformComponentId(kvp.Value);
+                node.hashToNodePath.TryAdd(kvp.Key, node.GetPathTo(target));
+                hashToNode.TryAdd(kvp.Key, target);
             }
             foreach (var item in avatarAsset.baseField["m_TOS.Array"])
             {
+                break;
                 var first = item["first"].AsUInt;
                 var second = item["second"].AsString;
                 var path = string.Join("/", second.Split("/").Select(x => x.ValidateNodeName()));
                 hashToNode.TryAdd(first, node.GetNode<HolderNode>(path));
+                node.hashToNodePath.TryAdd(first, path);
             }
             AnimationPlayer player = new AnimationPlayer();
             AnimationLibrary library = GetAnimationLibrary(ctrlAsset, hashToNode, node);
@@ -44,16 +48,9 @@ namespace Hypernex.GodotVersion.UnityLoader
             return player;
         }
 
-        public AnimationLibrary GetAnimationLibraryNoLookup(AssetExternal ctrlAsset, HolderNode node)
+        public AnimationLibrary GetAnimationLibraryUseExistingTOS(AssetExternal ctrlAsset, HolderNode node)
         {
-            Dictionary<HashNum, long> hashToXform = new Dictionary<HashNum, long>();
-            BuildTOS(hashToXform, node.assetTransformField);
-            Dictionary<HashNum, HolderNode> hashToNode = new Dictionary<HashNum, HolderNode>();
-            foreach (var kvp in hashToXform)
-            {
-                hashToNode.Add(kvp.Key, GetNodeByTransformComponentId(kvp.Value));
-            }
-            return GetAnimationLibrary(ctrlAsset, hashToNode, node);
+            return GetAnimationLibrary(ctrlAsset, node.hashToNode, node);
         }
 
         public AnimationLibrary GetAnimationLibrary(AssetExternal ctrlAsset, Dictionary<HashNum, HolderNode> hashToNode, HolderNode node)
