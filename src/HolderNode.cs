@@ -180,7 +180,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                     // skel.AddChild(meshInst, true);
                     Parent.Setup(reader);
                     skel.MotionScale = Parent.avatarScale;
-                    // skel.AddBone("Root");
                     int rootBone = -1;
                     Axes rootAxes = null;
                     foreach (var kvp in Parent.humanBoneAxes)
@@ -192,13 +191,18 @@ namespace Hypernex.GodotVersion.UnityLoader
                             break;
                         }
                     }
-                    var scl = Transform3D.Identity;
-                    if (rootBoneFileId.HasValue)
+                    if (!rootBoneFileId.HasValue)
                     {
-                        var boneNode = reader.GetNodeByTransformComponentId(rootBoneFileId.Value).Parent;
+                        // var boneNode = reader.GetNodeByTransformComponentId(rootBoneFileId.Value);
+                        skel.AddBone("Root");
+                        var boneNode = Parent;
                         if (IsInstanceValid(boneNode))
                         {
-                            // scl = boneNode.Transform;
+                            var xform = GetTransformGlobal(this).AffineInverse() * GetTransformGlobal(boneNode);
+                            if (IsInstanceValid(rootAxes))
+                                xform = xform.Scaled(rootAxes.scale);
+                            skel.SetBoneRest(0, xform);
+                            skel.SetBoneEnabled(0, false);
                         }
                     }
                     if (IsInstanceValid(rootAxes))
@@ -243,30 +247,19 @@ namespace Hypernex.GodotVersion.UnityLoader
                             int idx = skel.FindBone(boneParent.Name);
                             if (idx != boneIdx)
                             {
-                                // if (idx == -1)
-                                //     idx = 0;
+                                if (idx == -1)
+                                    idx = 0;
                                 skel.SetBoneParent(boneIdx, idx);
                             }
                         }
                         if (rootBoneFileId.HasValue && id == rootBoneFileId.Value)
                         {
-                            // if (IsInstanceValid(rootAxes))
-                            //     xform = rootAxes.xform * xform;
-                            // xform = Transform3D.Identity;
                             xform = GetTransformGlobal(this).AffineInverse() * GetTransformGlobal(boneNode);
                             if (IsInstanceValid(rootAxes))
                                 xform = xform.Scaled(rootAxes.scale);
-                            // if (IsInstanceValid(rootAxes))
-                            //     xform = GetTransformGlobal(boneNode) * rootAxes.xform;
-                            //     xform = rootAxes.xform.AffineInverse() * GetTransformGlobal(boneNode);
-                            // xform = xform.Scaled(Vector3.One / Scale);
-                            // xform = GlobalTransform.AffineInverse() * xform;
-                            // xform = GetTransformPath(boneNode, this);// * boneNode.Transform.AffineInverse();
-                            // xform = Transform.AffineInverse() * xform;
                             rootBone = boneIdx;
                             skel.SetBoneEnabled(boneIdx, false);
                         }
-                        // xform = xform.Scaled(Vector3.One / xform.Basis.Scale);
                         skel.SetBoneRest(boneIdx, xform);
                         skel.SetBonePose(boneIdx, xform);
                     }
@@ -380,7 +373,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             if (IsInstanceValid(anim))
                 anim.Play(anim.GetAnimationList().First());
 
-            GD.PrintS(GlobalTransform.Origin, GetTransformGlobal(this).Origin);
+            // GD.PrintS(GlobalTransform.Origin, GetTransformGlobal(this).Origin);
 
             return;
             // /*
@@ -433,7 +426,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 }
                 else
                 {
-                    // skel.ResetBonePoses();
+                    skel.ResetBonePoses();
                     foreach (var kvp in skeletonBoneMap)
                     {
                         // break;
