@@ -129,10 +129,10 @@ namespace Hypernex.GodotVersion.UnityLoader
                     axes.length = item["m_Length"].AsFloat;
                     axes.maxRad = GetVector3NoFlip(item["m_Limit.m_Max"]);
                     axes.minRad = GetVector3NoFlip(item["m_Limit.m_Min"]);
-                    // the t r s doesn't need to be read here...
                     axes.position = GetVector3(humanSkeletonPose[i]["t"]);
                     axes.rotation = GetQuaternion(humanSkeletonPose[i]["q"]);
                     axes.scale = GetVector3NoFlip(humanSkeletonPose[i]["s"]);
+                    hashToNode[data].Transform = axes.xform;
                     node.humanBoneAxes.TryAdd(node.GetPathTo(hashToNode[data]), axes);
                     // var hName = HumanTrait.BoneName[i];
                     string hName = null;
@@ -175,28 +175,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                     axes.position = GetVector3(human2SkeletonPose[i]["t"]);
                     axes.rotation = GetQuaternion(human2SkeletonPose[i]["q"]);
                     axes.scale = GetVector3NoFlip(human2SkeletonPose[i]["s"]);
-                    // else
-                    {
-                        // GD.PrintErr(path);
-                    }
-                    // continue;
-                    string hName = null;
-                    for (int j = 0; j < humanHumanIds.AsArray.size; j++)
-                    {
-                        if (i == humanHumanIds[j].AsInt)
-                        {
-                            hName = HumanTrait.BoneIndexToName[j];
-                            break;
-                        }
-                    }
-                    if (string.IsNullOrEmpty(hName))
-                    {
-                        // GD.PrintErr($"hName not found! i: {i} data: {data} path: {path}");
-                        continue;
-                    }
-                    axes.humanBoneName = hName;
-                    // GD.Print($"hName found! hName: {hName} i: {i} data: {data} path: {path}");
-                    node.boneToNode.TryAdd(hName, path);
+                    hashToNode[data].Transform = axes.xform;
+                    node.boneToNode.TryAdd(hashToNode[data].Name, path);
                 }
             }
         }

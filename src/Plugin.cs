@@ -53,8 +53,18 @@ namespace Hypernex.GodotVersion.UnityLoader
                                 node.GetComponent<AnimationPlayer>().AddAnimationLibrary(animCtrl.baseField["m_Name"].AsString, library);
                             }
                         }
-                        // avi.Skeleton = "../" + node.GetPathTo(node.GetComponent<Skeleton3D>());
-                        return null;
+                        var skel = node.GetComponent<Skeleton3D>();
+                        if (skel == null || true)
+                        {
+                            return null;
+                        }
+                        var eyes = new Node3D();
+                        node.AddChild(eyes);
+                        avi.Skeleton = "../" + node.GetPathTo(skel);
+                        avi.Eyes = "../" + node.GetPathTo(eyes);
+                        var xform = HolderNode.GetTransformGlobal(skel);
+                        // node.Scale /= xform.Basis.Scale;
+                        // avi.Eyes = "../" + node.boneToNode[HumanBodyBones.Head.ToString()];
                         return avi;
                     }
                 }

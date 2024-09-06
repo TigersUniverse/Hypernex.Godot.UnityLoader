@@ -264,18 +264,16 @@ namespace Hypernex.GodotVersion.UnityLoader
             }
             for (int i = 0; i < BoneName.Length; i++)
             {
-                // if (i != 7 && i != 8 && i != 9 && i != 10)
                 var hName = BoneName[i];
                 if (!node.boneToNode.ContainsKey(hName))
                     continue;
                 var bone = node.GetNode<HolderNode>(node.boneToNode[hName]);
-                if (i == 0)
+                if (i == 0 && false)
                 {
-                    continue;
-                    bone.Position = node.rootBonePosition;
-                    bone.Quaternion = node.rootBoneRotation;
-                    bone.Scale = node.rootBoneScale;
-                    continue;
+                    // bone.Position = node.rootBonePosition;
+                    // bone.Quaternion = node.rootBoneRotation;
+                    // bone.Scale = node.rootBoneScale;
+                    // continue;
                 }
                 if (!node.humanBoneAxes.ContainsKey(node.boneToNode[hName]))
                     continue;
@@ -285,9 +283,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                 float x = swingTwists[j3][0];
                 float y = swingTwists[j3][1];
                 float z = swingTwists[j3][2];
-                // z *= BundleReader.zFlipper;
-                // GD.PrintS(node.GetPath(), MuscleName[MuscleFromBone[i][0]], x, MuscleName[MuscleFromBone[i][1]], y, MuscleName[MuscleFromBone[i][2]], z);
-                // GD.PrintS(node.GetPath(), MuscleName[MuscleFromBone[i][0]], x, limits.min.X, limits.max.X);
                 x *= Mathf.DegToRad(x >= 0 ? limits.max.X : -limits.min.X) * limits.sgn.X;
                 y *= Mathf.DegToRad(y >= 0 ? limits.max.Y : -limits.min.Y) * limits.sgn.Y;
                 z *= Mathf.DegToRad(z >= 0 ? limits.max.Z : -limits.min.Z) * limits.sgn.Z;
@@ -304,11 +299,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     preQ = popQ.AsQuaternion().Normalized() * preQ;
 
                 var localQ = preQ.Normalized() * SwingTwist(x * weightReal, y, z).Normalized() * invPostQ;
-                // var localQ = preQ.Normalized() * Quaternion.FromEuler(new Vector3(x, y, z) * weightReal) * invPostQ;
                 bone.Quaternion = FlipZ(localQ).Normalized();
-                // bone.Basis = new Basis(localQ);
-                // bone.Basis = new Basis(FlipZ(localQ)).Orthonormalized();// * Basis.FlipZ;//.Scaled(new Vector3(1f, 1f, -1f));
-                // GD.PrintS(node.GetPath(), hName, new Vector3(x, y, z) * (180f / Mathf.Pi), SwingTwist(x * weightReal, y, z).GetEuler() * (180f / Mathf.Pi));
             }
         }
 
