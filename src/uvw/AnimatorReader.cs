@@ -146,7 +146,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     }
                     if (string.IsNullOrEmpty(hName))
                     {
-                        GD.PrintErr($"hName not found! i: {i} axesId: {axesId}");
+                        // GD.PrintErr($"hName not found! i: {i} axesId: {axesId}");
                         continue;
                     }
                     axes.humanBoneName = hName;
@@ -195,7 +195,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                         continue;
                     }
                     axes.humanBoneName = hName;
-                    GD.Print($"hName found! hName: {hName} i: {i} data: {data} path: {path}");
+                    // GD.Print($"hName found! hName: {hName} i: {i} data: {data} path: {path}");
                     node.boneToNode.TryAdd(hName, path);
                 }
             }

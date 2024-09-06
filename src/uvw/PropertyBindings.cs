@@ -67,8 +67,20 @@ namespace Hypernex.GodotVersion.UnityLoader
                 switch (type)
                 {
                     case 1: // Root
-                        // TODO
-                        break;
+                        if (index < 3)
+                        {
+                            var pos = node.rootBonePosition;
+                            pos[(int)index] = value;
+                            node.rootBonePosition = pos;
+                            return HolderNode.PropertyName.rootBonePosition;
+                        }
+                        else
+                        {
+                            var rot = node.rootBoneRotation;
+                            rot[(int)index-3] = value;
+                            node.rootBoneRotation = rot;
+                            return HolderNode.PropertyName.rootBoneRotation;
+                        }
                 }
                 return string.Empty;
             }

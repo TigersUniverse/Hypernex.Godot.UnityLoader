@@ -265,12 +265,20 @@ namespace Hypernex.GodotVersion.UnityLoader
             for (int i = 0; i < BoneName.Length; i++)
             {
                 // if (i != 7 && i != 8 && i != 9 && i != 10)
-                // if (i == 0)
-                //     continue;
                 var hName = BoneName[i];
-                if (!node.boneToNode.ContainsKey(hName) || !node.humanBoneAxes.ContainsKey(node.boneToNode[hName]))
+                if (!node.boneToNode.ContainsKey(hName))
                     continue;
                 var bone = node.GetNode<HolderNode>(node.boneToNode[hName]);
+                if (i == 0)
+                {
+                    continue;
+                    bone.Position = node.rootBonePosition;
+                    bone.Quaternion = node.rootBoneRotation;
+                    bone.Scale = node.rootBoneScale;
+                    continue;
+                }
+                if (!node.humanBoneAxes.ContainsKey(node.boneToNode[hName]))
+                    continue;
                 var limits = node.humanBoneAxes[node.boneToNode[hName]];
                 int j3 = i;
                 var invPostQ = Invert(limits.postQ).Normalized();
@@ -298,6 +306,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 var localQ = preQ.Normalized() * SwingTwist(x * weightReal, y, z).Normalized() * invPostQ;
                 // var localQ = preQ.Normalized() * Quaternion.FromEuler(new Vector3(x, y, z) * weightReal) * invPostQ;
                 bone.Quaternion = FlipZ(localQ).Normalized();
+                // bone.Basis = new Basis(localQ);
                 // bone.Basis = new Basis(FlipZ(localQ)).Orthonormalized();// * Basis.FlipZ;//.Scaled(new Vector3(1f, 1f, -1f));
                 // GD.PrintS(node.GetPath(), hName, new Vector3(x, y, z) * (180f / Mathf.Pi), SwingTwist(x * weightReal, y, z).GetEuler() * (180f / Mathf.Pi));
             }
@@ -315,7 +324,8 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public static Quaternion Invert(Quaternion q)
         {
-            return q.Inverse();
+            if (BundleReader.flipZ)
+                return q.Inverse();
             var dot = q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
             var invDot = Mathf.IsZeroApprox(dot) ? 0f : (1f / dot);
             return new Quaternion(-q[0] * invDot, -q[1] * invDot, -q[2] * invDot, q[3] * invDot);

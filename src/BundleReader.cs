@@ -255,7 +255,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                     var position = GetVector3(compBase["m_LocalPosition"]);
                     var rotation = GetQuaternion(compBase["m_LocalRotation"]);
                     var scale = GetVector3NoFlip(compBase["m_LocalScale"]);
-                    // node.Transform = new Transform3D(new Basis(rotation).Scaled(scale), position).ScaledLocal(new Vector3(1f, 1f, zFlipper));
                     node.Position = position;
                     node.Quaternion = rotation;
                     node.Scale = scale;
@@ -306,6 +305,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                             ArrayMesh mesh = GetMesh(zippath, meshAsset.file, meshAsset.baseField);
                             assets.Add(pathId, mesh);
                             node.mesh = mesh;
+                            node.bindPoses = GetMeshBindPose(zippath, meshAsset.file, meshAsset.baseField);
                         }
                     }
                     // materials
@@ -522,6 +522,77 @@ namespace Hypernex.GodotVersion.UnityLoader
         public static Quaternion GetQuaternionNoFlip(AssetTypeValueField field)
         {
             return new Quaternion(field["x"].AsFloat, field["y"].AsFloat, field["z"].AsFloat, field["w"].AsFloat);
+        }
+
+        public static Transform3D GetTransform3D(AssetTypeValueField field)
+        {
+            return new Transform3D(
+                new Vector3(field["e00"].AsFloat, field["e10"].AsFloat, field["e20"].AsFloat),
+                new Vector3(field["e01"].AsFloat, field["e11"].AsFloat, field["e21"].AsFloat),
+                new Vector3(field["e02"].AsFloat, field["e12"].AsFloat, field["e22"].AsFloat),
+
+                new Vector3(field["e03"].AsFloat, field["e13"].AsFloat, field["e23"].AsFloat)
+            );
+
+            return new Transform3D(
+                new Vector3(field["e00"].AsFloat, field["e10"].AsFloat, field["e20"].AsFloat),
+                new Vector3(field["e01"].AsFloat, field["e11"].AsFloat, field["e21"].AsFloat),
+                new Vector3(field["e02"].AsFloat, field["e12"].AsFloat, field["e22"].AsFloat),
+
+                new Vector3(field["e03"].AsFloat, field["e13"].AsFloat, field["e23"].AsFloat)
+            );
+        }
+
+        // public static Transform3D FlipXformZ(Transform3D xform)
+        // {
+        // }
+
+        public static Transform3D GetTransform3DNoFlip(AssetTypeValueField field)
+        {
+            /*return (Transform3D)new Projection(
+                new Vector4(field["e03"].AsFloat, field["e13"].AsFloat, field["e23"].AsFloat, field["e33"].AsFloat),
+                new Vector4(field["e02"].AsFloat, field["e12"].AsFloat, field["e22"].AsFloat, field["e32"].AsFloat),
+                new Vector4(field["e01"].AsFloat, field["e11"].AsFloat, field["e21"].AsFloat, field["e31"].AsFloat),
+                new Vector4(field["e00"].AsFloat, field["e10"].AsFloat, field["e20"].AsFloat, field["e30"].AsFloat)
+            );*/
+            return (Transform3D)new Projection(
+                new Vector4(field["e00"].AsFloat, field["e10"].AsFloat, field["e20"].AsFloat, field["e30"].AsFloat),
+                new Vector4(field["e01"].AsFloat, field["e11"].AsFloat, field["e21"].AsFloat, field["e31"].AsFloat),
+                new Vector4(field["e02"].AsFloat, field["e12"].AsFloat, field["e22"].AsFloat, field["e32"].AsFloat),
+                new Vector4(field["e03"].AsFloat, field["e13"].AsFloat, field["e23"].AsFloat, field["e33"].AsFloat)
+            );
+
+            return new Transform3D(
+                field["e00"].AsFloat,
+                field["e10"].AsFloat,
+                field["e20"].AsFloat,
+
+                field["e01"].AsFloat,
+                field["e11"].AsFloat,
+                field["e21"].AsFloat,
+
+                field["e02"].AsFloat,
+                field["e12"].AsFloat,
+                field["e22"].AsFloat,
+
+                field["e03"].AsFloat,
+                field["e13"].AsFloat,
+                field["e23"].AsFloat
+            );
+            return new Transform3D(
+                field["e00"].AsFloat,
+                field["e01"].AsFloat,
+                field["e02"].AsFloat,
+                field["e03"].AsFloat,
+                field["e10"].AsFloat,
+                field["e11"].AsFloat,
+                field["e12"].AsFloat,
+                field["e13"].AsFloat,
+                field["e20"].AsFloat,
+                field["e21"].AsFloat,
+                field["e22"].AsFloat,
+                field["e23"].AsFloat
+            );
         }
 
         public static Mesh.ArrayType GetMeshArrayType(int input)
@@ -848,6 +919,17 @@ namespace Hypernex.GodotVersion.UnityLoader
                 }
             }
             return material;
+        }
+
+        public Godot.Collections.Array<Transform3D> GetMeshBindPose(string zippath, AssetsFileInstance fileInst, AssetTypeValueField field)
+        {
+            var arr = new Godot.Collections.Array<Transform3D>();
+            var bindPoseArray = field["m_BindPose.Array"];
+            for (int i = 0; i < bindPoseArray.AsArray.size; i++)
+            {
+                arr.Add(GetTransform3D(bindPoseArray[i]));
+            }
+            return arr;
         }
 
         public ArrayMesh GetMesh(string zippath, AssetsFileInstance fileInst, AssetTypeValueField field)
