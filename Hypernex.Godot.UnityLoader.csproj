@@ -15,4 +15,7 @@
       <HintPath>..\Hypernex.Godot\Hypernex.Godot\addons\Hypernex.CCK\Hypernex.CCK.dll</HintPath>
     </Reference>
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="assets/**" />
+  </ItemGroup>
 </Project>

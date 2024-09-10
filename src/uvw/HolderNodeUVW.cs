@@ -16,10 +16,10 @@ namespace Hypernex.GodotVersion.UnityLoader
         [Export]
         public Vector3 rootBoneEuler
         {
-            get => rootBoneRotation.GetEuler();
+            get => rootBoneRotation.Normalized().GetEuler();
             set => rootBoneRotation = Quaternion.FromEuler(value);
         }
         [Export]
-        public Vector3 rootBoneScale = Vector3.One;
+        public Vector3 rootBoneScale = Vector3.Zero;
     }
 }

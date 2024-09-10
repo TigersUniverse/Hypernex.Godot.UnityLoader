@@ -232,7 +232,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                 if (GodotObject.IsInstanceValid(comp))
                 {
                     node.components.Add(comp);
-                    node.AddChild(comp);
+                    if (!root.IsAncestorOf(comp))
+                        node.AddChild(comp);
                     comp.Owner = root;
                 }
                 return;
@@ -272,7 +273,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                     // GD.PrintS(node.Name, meshAsset.info == null);
                     if (meshAsset.info == null)
                     {
-                        // GD.Print(meshPtr.ToString());
+                        if (TryGetBuiltinMesh(manager, fileInst, meshPtr, out var m))
+                            node.mesh = m;
                         break;
                     }
                     var pathId = new AssetInfo(meshPtr);
@@ -289,6 +291,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 }
                 case AssetClassID.SkinnedMeshRenderer:
                 {
+                    MeshInfo info = new MeshInfo();
                     // mesh
                     {
                         var meshPtr = compBase["m_Mesh"];
@@ -299,12 +302,12 @@ namespace Hypernex.GodotVersion.UnityLoader
                         }
                         var pathId = new AssetInfo(meshPtr);
                         if (assets.TryGetValue(pathId, out var val))
-                            node.mesh = val as Mesh;
+                            info.mesh = val as Mesh;
                         else
                         {
                             ArrayMesh mesh = GetMesh(zippath, meshAsset.file, meshAsset.baseField);
                             assets.Add(pathId, mesh);
-                            node.mesh = mesh;
+                            info.mesh = mesh;
                             node.bindPoses = GetMeshBindPose(zippath, meshAsset.file, meshAsset.baseField);
                         }
                     }
@@ -315,16 +318,16 @@ namespace Hypernex.GodotVersion.UnityLoader
                         var matAsset = manager.GetExtAsset(fileInst, matPtr);
                         if (matAsset.info == null)
                         {
-                            node.materials.Add(null);
+                            info.materials.Add(null);
                             continue;
                         }
                         var pathId = new AssetInfo(matPtr);
                         if (assets.TryGetValue(pathId, out var val))
-                            node.materials.Add(val as Material);
+                            info.materials.Add(val as Material);
                         else
                         {
                             Material mat = GetStandardMaterial(zippath, manager, matAsset.file, matAsset.baseField);
-                            node.materials.Add(mat);
+                            info.materials.Add(mat);
                             assets.Add(pathId, mat);
                         }
                     }
@@ -335,69 +338,123 @@ namespace Hypernex.GodotVersion.UnityLoader
                     {
                         node.boneFileIds.Add(bonePtr["m_PathID"].AsLong);
                     }
+                    node.meshes.Add(info);
                     break;
                 }
                 case AssetClassID.MeshRenderer:
                 {
+                    MeshInfo info = new MeshInfo();
                     var materials = compBase["m_Materials.Array"];
-                    node.firstSubmesh = compBase["m_StaticBatchInfo.firstSubMesh"].AsUShort;
-                    node.subMeshCount = compBase["m_StaticBatchInfo.subMeshCount"].AsUShort;
+                    info.visible = compBase["m_Enabled"].AsBool;
+                    info.firstSubmesh = compBase["m_StaticBatchInfo.firstSubMesh"].AsUShort;
+                    info.subMeshCount = compBase["m_StaticBatchInfo.subMeshCount"].AsUShort;
                     foreach (var matPtr in materials)
                     {
                         var matAsset = manager.GetExtAsset(fileInst, matPtr);
                         if (matAsset.info == null)
                         {
-                            node.materials.Add(null);
+                            info.materials.Add(null);
                             continue;
                         }
                         var pathId = new AssetInfo(matPtr);
                         if (assets.TryGetValue(pathId, out var val))
-                            node.materials.Add(val as Material);
+                            info.materials.Add(val as Material);
                         else
                         {
                             Material mat = GetStandardMaterial(zippath, manager, matAsset.file, matAsset.baseField);
-                            node.materials.Add(mat);
+                            info.materials.Add(mat);
                             assets.Add(pathId, mat);
                         }
                     }
+                    node.meshes.Add(info);
                     break;
                 }
                 case AssetClassID.MeshCollider:
                 {
+                    ShapeInfo info = new ShapeInfo();
                     var meshPtr = compBase["m_Mesh"];
                     var meshAsset = manager.GetExtAsset(fileInst, meshPtr);
                     if (meshAsset.info == null)
-                        break;
-                    var pathId = new AssetInfo(meshPtr);
-                    Mesh mesh;
-                    if (assets.TryGetValue(pathId, out var val))
-                        mesh = val as Mesh;
+                    {
+                        if (TryGetBuiltinMesh(manager, fileInst, meshPtr, out var mesh))
+                        {
+                            if (GodotObject.IsInstanceValid(mesh))
+                            {
+                                if (compBase["m_Convex"].AsBool)
+                                    info.shape = mesh.CreateConvexShape();
+                                else
+                                    info.shape = mesh.CreateTrimeshShape();
+                            }
+                        }
+                        else
+                            break;
+                    }
                     else
                     {
-                        mesh = GetMesh(zippath, meshAsset.file, meshAsset.baseField);
-                        assets.Add(pathId, mesh);
+                        var pathId = new AssetInfo(meshPtr);
+                        Mesh mesh;
+                        if (assets.TryGetValue(pathId, out var val))
+                            mesh = val as Mesh;
+                        else
+                        {
+                            mesh = GetMesh(zippath, meshAsset.file, meshAsset.baseField);
+                            assets.Add(pathId, mesh);
+                        }
+                        if (GodotObject.IsInstanceValid(mesh))
+                        {
+                            if (compBase["m_Convex"].AsBool)
+                                info.shape = mesh.CreateConvexShape();
+                            else
+                                info.shape = mesh.CreateTrimeshShape();
+                        }
                     }
-                    if (compBase["m_Convex"].AsBool)
-                        node.shape = mesh.CreateConvexShape();
-                    else
-                        node.shape = mesh.CreateTrimeshShape();
-                    node.shapeCenter = Vector3.Zero;
-                    node.shapeEnabled = compBase["m_Enabled"].AsBool;
-                    node.shapeTrigger = compBase["m_IsTrigger"].AsBool;
+                    info.shapeCenter = Vector3.Zero;
+                    info.shapeEnabled = compBase["m_Enabled"].AsBool;
+                    info.shapeTrigger = compBase["m_IsTrigger"].AsBool;
+                    node.shapes.Add(info);
                     break;
                 }
                 case AssetClassID.BoxCollider:
                 {
+                    ShapeInfo info = new ShapeInfo();
                     var box = new BoxShape3D();
                     box.Size = GetVector3NoFlip(compBase["m_Size"]);
-                    node.shape = box;
-                    node.shapeCenter = GetVector3(compBase["m_Center"]);
-                    node.shapeEnabled = compBase["m_Enabled"].AsBool;
-                    node.shapeTrigger = compBase["m_IsTrigger"].AsBool;
+                    info.shape = box;
+                    info.shapeCenter = GetVector3(compBase["m_Center"]);
+                    info.shapeEnabled = compBase["m_Enabled"].AsBool;
+                    info.shapeTrigger = compBase["m_IsTrigger"].AsBool;
+                    node.shapes.Add(info);
+                    break;
+                }
+                case AssetClassID.SphereCollider:
+                {
+                    ShapeInfo info = new ShapeInfo();
+                    var box = new SphereShape3D();
+                    box.Radius = compBase["m_Radius"].AsFloat;
+                    info.shape = box;
+                    info.shapeCenter = GetVector3(compBase["m_Center"]);
+                    info.shapeEnabled = compBase["m_Enabled"].AsBool;
+                    info.shapeTrigger = compBase["m_IsTrigger"].AsBool;
+                    node.shapes.Add(info);
+                    break;
+                }
+                case AssetClassID.CapsuleCollider:
+                {
+                    // TODO: add m_Direction support
+                    ShapeInfo info = new ShapeInfo();
+                    var box = new CapsuleShape3D();
+                    box.Radius = compBase["m_Radius"].AsFloat;
+                    box.Height = compBase["m_Height"].AsFloat;
+                    info.shape = box;
+                    info.shapeCenter = GetVector3(compBase["m_Center"]);
+                    info.shapeEnabled = compBase["m_Enabled"].AsBool;
+                    info.shapeTrigger = compBase["m_IsTrigger"].AsBool;
+                    node.shapes.Add(info);
                     break;
                 }
                 case AssetClassID.AudioSource:
                 {
+                    AudioInfo info = new  AudioInfo();
                     var clipPtr = compBase["m_audioClip"];
                     int rolloff = compBase["rolloffMode"].AsInt;
                     bool playOnAwake = compBase["m_PlayOnAwake"].AsBool;
@@ -405,29 +462,30 @@ namespace Hypernex.GodotVersion.UnityLoader
                     var audioAsset = manager.GetExtAsset(fileInst, clipPtr);
                     if (audioAsset.info != null)
                     {
-                        node.audioStream = GetAudio(zippath, manager, bundleFile, fileInst, audioAsset.baseField);
+                        info.audioStream = GetAudio(zippath, manager, bundleFile, fileInst, audioAsset.baseField);
                     }
-                    node.autoPlayAudio = playOnAwake;
-                    node.loopAudio = loop;
-                    node.audioVolumeDb = Mathf.LinearToDb(compBase["m_Volume"].AsFloat);
-                    node.audioMaxDistance = compBase["MaxDistance"].AsFloat;
+                    info.autoPlayAudio = playOnAwake;
+                    info.loopAudio = loop;
+                    info.audioVolumeDb = Mathf.LinearToDb(compBase["m_Volume"].AsFloat);
+                    info.audioMaxDistance = compBase["MaxDistance"].AsFloat;
                     switch (rolloff)
                     {
                         case 0:
-                            node.attenuation = AudioStreamPlayer3D.AttenuationModelEnum.Logarithmic;
+                            info.attenuation = AudioStreamPlayer3D.AttenuationModelEnum.Logarithmic;
                             break;
                         case 1:
-                            node.attenuation = AudioStreamPlayer3D.AttenuationModelEnum.InverseDistance;
+                            info.attenuation = AudioStreamPlayer3D.AttenuationModelEnum.InverseDistance;
                             break;
                         case 2:
-                            node.attenuation = AudioStreamPlayer3D.AttenuationModelEnum.Disabled;
+                            info.attenuation = AudioStreamPlayer3D.AttenuationModelEnum.Disabled;
                             break;
                     }
-                    node.audioPan = compBase["panLevelCustomCurve.m_Curve.Array"][0]["value"].AsFloat;
-                    if (Mathf.IsZeroApprox(node.audioPan))
+                    info.audioPan = compBase["panLevelCustomCurve.m_Curve.Array"][0]["value"].AsFloat;
+                    if (Mathf.IsZeroApprox(info.audioPan))
                     {
-                        node.attenuation = AudioStreamPlayer3D.AttenuationModelEnum.Disabled;
+                        info.attenuation = AudioStreamPlayer3D.AttenuationModelEnum.Disabled;
                     }
+                    node.audios.Add(info);
                     break;
                 }
                 case AssetClassID.Light:
@@ -481,18 +539,117 @@ namespace Hypernex.GodotVersion.UnityLoader
                     }
                     break;
                 }
+                case AssetClassID.ReflectionProbe:
+                {
+                    ReflectionProbe probe = new ReflectionProbe();
+                    probe.UpdateMode = ReflectionProbe.UpdateModeEnum.Always;
+                    probe.BoxProjection = true;
+                    probe.OriginOffset = GetVector3(compBase["m_BoxOffset"]);
+                    probe.Size = GetVector3NoFlip(compBase["m_BoxSize"]);
+                    probe.MaxDistance = probe.Size.Length() * 2f;
+                    node.AddChild(probe);
+                    node.components.Add(probe);
+                    break;
+                }
+                case AssetClassID.Rigidbody:
+                {
+                    node.hasRigidbody = true;
+                    node.rigidbodyMass = compBase["m_Mass"].AsFloat;
+                    // TODO
+                    break;
+                }
             }
         }
 
-        public static AssetExternal GetAsset(AssetsManager manager, AssetTypeValueField field)
+        public static bool TryGetBuiltinMesh(AssetsManager manager, AssetsFileInstance fileInstance, AssetTypeValueField field, out Mesh mesh)
         {
-            foreach (var file in manager.Files)
+            switch (field["m_PathID"].AsLong)
             {
-                var asset = manager.GetExtAsset(file, field);
-                if (asset.info != null)
-                    return asset;
+                case 10202:
+                    mesh = GetPrimaryMesh(GetBuiltinScene("Cube.glb"));
+                    return true;
+                case 10206:
+                    mesh = GetPrimaryMesh(GetBuiltinScene("Cylinder.glb"));
+                    return true;
+                case 10207:
+                    mesh = GetPrimaryMesh(GetBuiltinScene("Sphere.glb"));
+                    return true;
+                case 10208:
+                    mesh = GetPrimaryMesh(GetBuiltinScene("Capsule.glb"));
+                    return true;
+                case 10209:
+                    mesh = GetPrimaryMesh(GetBuiltinScene("Plane.glb"));
+                    return true;
+                case 10210:
+                    mesh = GetPrimaryMesh(GetBuiltinScene("Quad.glb"));
+                    return true;
             }
-            return default;
+            mesh = null;
+            return false;
+        }
+
+        public static Mesh GetPrimaryMesh(Node scn)
+        {
+            if (!GodotObject.IsInstanceValid(scn))
+                return null;
+            Mesh mesh = null;
+            var meshes = scn.FindChildren("*", nameof(MeshInstance3D));
+            if (meshes.Count != 0)
+            {
+                mesh = ((MeshInstance3D)meshes[0]).Mesh.Duplicate(true) as Mesh;
+            }
+            scn.Free();
+            return mesh;
+        }
+
+        public static Mesh GetPrimaryMesh(PackedScene scn)
+        {
+            if (!GodotObject.IsInstanceValid(scn))
+                return null;
+            var n = scn.Instantiate();
+            Mesh mesh = null;
+            var meshes = n.FindChildren("*", nameof(MeshInstance3D));
+            if (meshes.Count != 0)
+            {
+                mesh = ((MeshInstance3D)meshes[0]).Mesh.Duplicate(true) as Mesh;
+            }
+            n.Free();
+            return mesh;
+        }
+
+        public static Node GetBuiltinScene(string name)
+        {
+            string path = Path.Combine(OS.GetUserDataDir(), "temp.dat");
+            // using var fs = File.OpenWrite(path);
+            var stream = typeof(Plugin).Assembly.GetManifestResourceStream($"Hypernex.Godot.UnityLoader.assets.{name}");
+            // stream.CopyTo(fs);
+            byte[] dat = new byte[stream.Length];
+            stream.Read(dat);
+            // fs.Flush();
+            // fs.Close();
+            // fs.Dispose();
+            var state = new GltfState();
+            var doc = new GltfDocument();
+            doc.AppendFromBuffer(dat, string.Empty, state);
+            // doc.AppendFromFile(path, state);
+            return doc.GenerateScene(state);
+        }
+
+        public static T GetBuiltinAsset<T>(string name) where T : Resource
+        {
+            return GetBuiltinAsset(name, typeof(T).Name) as T;
+        }
+
+        public static Resource GetBuiltinAsset(string name, string type)
+        {
+            string path = Path.Combine(OS.GetUserDataDir(), name);
+            using var fs = File.OpenWrite(path);
+            var stream = typeof(Plugin).Assembly.GetManifestResourceStream($"Hypernex.Godot.UnityLoader.assets.{name}");
+            stream.CopyTo(fs);
+            fs.Flush();
+            fs.Close();
+            fs.Dispose();
+            return ResourceLoader.Load(path, type);
         }
 
         public static Vector2 GetVector2(AssetTypeValueField field)
@@ -690,11 +847,15 @@ namespace Hypernex.GodotVersion.UnityLoader
                         break;
                     case "wav":
                         GD.PrintErr($"wav: {name}");
+                        var path = Path.Combine(OS.GetUserDataDir(), "temp.wav");
+                        File.WriteAllBytes(path, audioFile);
+                        stream = GD.Load<AudioStreamWav>(path);
                         break;
                     default:
                         return null;
                 }
-                stream.ResourceName = name;
+                if (stream != null)
+                    stream.ResourceName = name;
                 return stream;
             }
             return null;
@@ -728,7 +889,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 var texAsset = manager.GetExtAsset(fileInst, texturePtr);
                 if (texAsset.info == null || texAsset.info.TypeId != (int)AssetClassID.Texture2D)
                     continue;
-                var texture = GetImage(zippath, fileInst, texAsset.baseField, out var transparent);
+                var texture = GetImage(zippath, fileInst, texAsset.baseField, out var transparent, out var texFile);
                 if (texture == null)
                     continue;
                 loadedResources[zippath].Add(texture);
@@ -765,6 +926,24 @@ namespace Hypernex.GodotVersion.UnityLoader
                         break;
                 }
             }
+            int nulls = 0;
+            for (int i = 0; i < 6; i++)
+            {
+                if (!GodotObject.IsInstanceValid(imgs[i]))
+                {
+                    nulls++;
+                    imgs[i] = Image.CreateEmpty(64, 64, false, Image.Format.Rgb8);
+                    loadedResources[zippath].Add(imgs[i]);
+                    imgs[i].Fill(Colors.Gray);
+                }
+            }
+            if (nulls == 6)
+            {
+                var m = new ProceduralSkyMaterial();
+                m.ResourceName = field["m_Name"].AsString;
+                loadedResources[zippath].Add(m);
+                return m;
+            }
             ShaderMaterial mat = new ShaderMaterial();
             mat.ResourceName = field["m_Name"].AsString;
             mat.Shader = new Shader()
@@ -789,15 +968,6 @@ namespace Hypernex.GodotVersion.UnityLoader
     "
             };
             Cubemap map = new Cubemap();
-            for (int i = 0; i < 6; i++)
-            {
-                if (!GodotObject.IsInstanceValid(imgs[i]))
-                {
-                    imgs[i] = Image.CreateEmpty(64, 64, false, Image.Format.Rgb8);
-                    loadedResources[zippath].Add(imgs[i]);
-                    imgs[i].Fill(Colors.Gray);
-                }
-            }
             map.CreateFromImages(imgs);
             mat.SetShaderParameter("cube_tex", map);
             mat.SetShaderParameter("tint", tint);
@@ -810,7 +980,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             StandardMaterial3D material = new StandardMaterial3D();
             material.ResourceName = field["m_Name"].AsString;
             loadedResources[zippath].Add(material);
-            material.VertexColorUseAsAlbedo = true;
+            // material.VertexColorUseAsAlbedo = true;
             if (!flipZ)
                 material.CullMode = BaseMaterial3D.CullModeEnum.Disabled; // debug
             foreach (var tagMap in field["stringTagMap.Array"])
@@ -872,7 +1042,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     texture = res as ImageTexture;
                 else
                 {
-                    var img = GetImage(zippath, fileInst, texAsset.baseField, out var transparent);
+                    var img = GetImage(zippath, fileInst, texAsset.baseField, out var transparent, out var texFile);
                     texture = ImageTexture.CreateFromImage(img);
                     assets.Add(info, texture);
                     loadedResources[zippath].Add(img);
@@ -884,38 +1054,39 @@ namespace Hypernex.GodotVersion.UnityLoader
                 loadedResources[zippath].Add(texture);
                 var scale = GetVector2(texKvp["second.m_Scale"]);
                 var offset = GetVector2(texKvp["second.m_Offset"]);
-                switch (propName)
+                var usage = texAsset.baseField["m_LightmapFormat"].AsInt;
+                if (propName.Contains("BaseMap", StringComparison.OrdinalIgnoreCase) || propName.Contains("Main", StringComparison.OrdinalIgnoreCase) || propName.Contains("Color", StringComparison.OrdinalIgnoreCase))
                 {
-                    case "_BaseMap":
-                    case "_MainTex":
-                        material.AlbedoTexture = texture;
-                        material.Uv1Scale = new Vector3(scale.X, scale.Y, 1f);
-                        material.Uv1Offset = new Vector3(offset.X, offset.Y, 1f);
-                        break;
-                    case "_MetallicGlossMap":
-                        material.MetallicTexture = texture;
-                        break;
-                    case "_SpecGlossMap":
-                        if (created)
-                        {
-                            var tex = SwapColorsRoughness(texture.GetImage());
-                            texture.Update(tex);
-                        }
-                        material.RoughnessTexture = texture;
-                        break;
-                    case "_BumpMap":
-                    case "_NormalMap":
-                        material.NormalEnabled = true;
-                        if (created)
-                        {
-                            var tex = SwapColors(texture.GetImage());
-                            texture.Update(tex);
-                        }
-                        material.NormalTexture = texture;
-                        break;
-                    default:
-                        // GD.Print(propName);
-                        break;
+                    material.AlbedoTexture = texture;
+                    material.Uv1Scale = new Vector3(scale.X, scale.Y, 1f);
+                    material.Uv1Offset = new Vector3(offset.X, offset.Y, 1f);
+                    if (texAsset.baseField["m_TextureSettings.m_FilterMode"].AsInt == 0)
+                    {
+                        material.TextureFilter = BaseMaterial3D.TextureFilterEnum.NearestWithMipmaps;
+                    }
+                }
+                else if (propName.Contains("Metallic", StringComparison.OrdinalIgnoreCase))
+                {
+                    material.MetallicTexture = texture;
+                }
+                else if (propName.Contains("SpecGloss", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (created)
+                    {
+                        var tex = SwapColorsRoughness(texture.GetImage());
+                        texture.Update(tex);
+                    }
+                    material.RoughnessTexture = texture;
+                }
+                else if (propName.Contains("Normal", StringComparison.OrdinalIgnoreCase) || propName.Contains("Bump", StringComparison.OrdinalIgnoreCase))
+                {
+                    material.NormalEnabled = true;
+                    if (created)
+                    {
+                        var tex = (usage == 3 || usage == 4 || usage == 10) ? SwapColors(texture.GetImage()) : SwapColors2(texture.GetImage());
+                        texture.Update(tex);
+                    }
+                    material.NormalTexture = texture;
                 }
             }
             return material;
@@ -934,7 +1105,11 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public ArrayMesh GetMesh(string zippath, AssetsFileInstance fileInst, AssetTypeValueField field)
         {
+            if (field == null || field.IsDummy)
+                return null;
             var vertChannels = field["m_VertexData.m_Channels.Array"];
+            if (vertChannels == null || vertChannels.IsDummy)
+                return null;
             Dictionary<Mesh.ArrayType, int> offsets = new Dictionary<Mesh.ArrayType, int>();
             Dictionary<Mesh.ArrayType, int> formats = new Dictionary<Mesh.ArrayType, int>();
             Dictionary<Mesh.ArrayType, int> streams = new Dictionary<Mesh.ArrayType, int>();
@@ -1174,11 +1349,18 @@ namespace Hypernex.GodotVersion.UnityLoader
             }
         }
 
-        public static Image GetImage(string zippath, AssetsFileInstance fileInst, AssetTypeValueField field, out bool transparent)
+        public static Image GetImage(string zippath, AssetsFileInstance fileInst, AssetTypeValueField field, out bool transparent, out TextureFile file)
         {
             transparent = false;
-            TextureFile file = TextureFile.ReadTextureFile(field);
+            file = null;
+            if (field == null || field.IsDummy)
+                return Image.CreateEmpty(64, 64, false, Image.Format.R8);
+            file = TextureFile.ReadTextureFile(field);
+            if (file == null)
+                return Image.CreateEmpty(64, 64, false, Image.Format.R8);
             byte[] data = file.GetTextureData(fileInst);
+            if (data == null)
+                return Image.CreateEmpty(64, 64, false, Image.Format.R8);
             for (int i = 0; i < data.Length; i+=4)
             {
                 byte b = data[i];
@@ -1195,7 +1377,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 }
             }
             Image img = Image.CreateFromData(file.m_Width, file.m_Height, false, Image.Format.Rgba8, data);
-            img.Resize(512, 512);
+            img.Resize(512, 512, Image.Interpolation.Nearest);
             img.GenerateMipmaps();
             return img;
         }
@@ -1214,6 +1396,26 @@ namespace Hypernex.GodotVersion.UnityLoader
                 data[i+1] = g;
                 data[i+2] = b;
                 data[i+3] = r;
+            }
+            Image img2 = Image.CreateFromData(img.GetWidth(), img.GetHeight(), true, Image.Format.Rgba8, data);
+            // img2.GenerateMipmaps();
+            return img2;
+        }
+
+        public static Image SwapColors2(Image img)
+        {
+            // img.ClearMipmaps();
+            byte[] data = img.GetData();
+            for (int i = 0; i < data.Length; i+=4)
+            {
+                byte r = data[i];
+                byte g = data[i+1];
+                byte b = data[i+2];
+                byte a = data[i+3];
+                data[i] = r;
+                data[i+1] = (byte)(byte.MaxValue - g);
+                data[i+2] = b;
+                data[i+3] = a;
             }
             Image img2 = Image.CreateFromData(img.GetWidth(), img.GetHeight(), true, Image.Format.Rgba8, data);
             // img2.GenerateMipmaps();

@@ -268,12 +268,12 @@ namespace Hypernex.GodotVersion.UnityLoader
                 if (!node.boneToNode.ContainsKey(hName))
                     continue;
                 var bone = node.GetNode<HolderNode>(node.boneToNode[hName]);
-                if (i == 0 && false)
+                if (i == 0)
                 {
                     // bone.Position = node.rootBonePosition;
                     // bone.Quaternion = node.rootBoneRotation;
                     // bone.Scale = node.rootBoneScale;
-                    // continue;
+                    continue;
                 }
                 if (!node.humanBoneAxes.ContainsKey(node.boneToNode[hName]))
                     continue;

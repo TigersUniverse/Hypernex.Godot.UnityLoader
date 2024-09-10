@@ -72,14 +72,16 @@ namespace Hypernex.GodotVersion.UnityLoader
                         {
                             var pos = node.rootBonePosition;
                             pos[(int)index] = value;
-                            node.rootBonePosition = pos;
+                            if (apply)
+                                node.rootBonePosition = pos;
                             return HolderNode.PropertyName.rootBonePosition;
                         }
                         else
                         {
                             var rot = node.rootBoneRotation;
                             rot[(int)index-3] = value;
-                            node.rootBoneRotation = rot;
+                            if (apply)
+                                node.rootBoneRotation = rot;
                             return HolderNode.PropertyName.rootBoneEuler;
                         }
                 }

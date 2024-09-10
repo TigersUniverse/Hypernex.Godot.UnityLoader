@@ -26,45 +26,29 @@ namespace Hypernex.GodotVersion.UnityLoader
         [Export]
         public Mesh mesh;
         [Export]
-        public bool shapeEnabled = true;
+        public Array<MeshInfo> meshes = new Array<MeshInfo>();
+
         [Export]
-        public bool shapeTrigger = false;
+        public bool hasRigidbody = false;
         [Export]
-        public Shape3D shape;
+        public float rigidbodyMass = 1f;
         [Export]
-        public Vector3 shapeCenter = Vector3.Zero;
+        public Array<ShapeInfo> shapes = new Array<ShapeInfo>();
+
         [Export]
-        public ushort firstSubmesh = 0;
-        [Export]
-        public ushort subMeshCount = 0;
-        [Export]
-        public Array<Material> materials = new Array<Material>();
+        public Array<AudioInfo> audios = new Array<AudioInfo>();
+
         public long? rootBoneFileId = null;
         [Export]
         public int rootBoneIndex = -1;
         [Export]
-        public NodePath rootBonePath;
+        public Array<NodePath> rootBonePaths = new Array<NodePath>();
         [Export]
         public Array<long> boneFileIds = new Array<long>();
         [Export]
         public Array<Transform3D> bindPoses = new Array<Transform3D>();
         [Export]
         public Dictionary<NodePath, int> skeletonBoneMap = new Dictionary<NodePath, int>();
-
-        [Export]
-        public AudioStream audioStream;
-        [Export]
-        public bool autoPlayAudio = false;
-        [Export]
-        public bool loopAudio = false;
-        [Export]
-        public AudioStreamPlayer3D.AttenuationModelEnum attenuation;
-        [Export]
-        public float audioMaxDistance;
-        [Export]
-        public float audioVolumeDb;
-        [Export]
-        public float audioPan;
 
         [Export]
         public Dictionary<string, NodePath> boneToNode = new Dictionary<string, NodePath>();
@@ -147,17 +131,26 @@ namespace Hypernex.GodotVersion.UnityLoader
             if (hasSetup)
                 return;
             hasSetup = true;
-            if (IsInstanceValid(mesh))
+            foreach (var kvp in humanBoneAxes)
             {
+                var bone = GetNodeOrNull<Node3D>(kvp.Key);
+                bone.Transform = kvp.Value.xform;
+            }
+            foreach (var info in meshes)
+            {
+                Mesh m = IsInstanceValid(info.mesh) ? info.mesh : mesh;
+                if (!IsInstanceValid(m))
+                    continue;
                 MeshInstance3D meshInst = new MeshInstance3D();
-                meshInst.Mesh = mesh;
-                if (subMeshCount == 0)
+                meshInst.Visible = info.visible;
+                meshInst.Mesh = m;
+                if (info.subMeshCount == 0)
                 {
-                    if (materials.Count != 0)
+                    if (info.materials.Count != 0)
                     {
-                        for (int i = 0; i < mesh.GetSurfaceCount(); i++)
+                        for (int i = 0; i < m.GetSurfaceCount(); i++)
                         {
-                            meshInst.SetSurfaceOverrideMaterial(i, materials[i % materials.Count]);
+                            meshInst.SetSurfaceOverrideMaterial(i, info.materials[i % info.materials.Count]);
                         }
                     }
                 }
@@ -165,19 +158,20 @@ namespace Hypernex.GodotVersion.UnityLoader
                 {
                     SurfaceTool st = new SurfaceTool();
                     ArrayMesh final = null;
-                    for (int i = 0; i < subMeshCount; i++)
+                    for (int i = 0; i < info.subMeshCount; i++)
                     {
-                        st.CreateFrom(mesh, i + firstSubmesh);
+                        st.CreateFrom(mesh, i + info.firstSubmesh);
                         final = st.Commit(final);
                     }
                     meshInst.Mesh = final;
-                    if (materials.Count != 0)
-                        for (int i = 0; i < subMeshCount; i++)
-                            meshInst.SetSurfaceOverrideMaterial(i, materials[i % materials.Count]);
+                    if (info.materials.Count != 0)
+                        for (int i = 0; i < info.subMeshCount; i++)
+                            meshInst.SetSurfaceOverrideMaterial(i, info.materials[i % info.materials.Count]);
                 }
+                meshInst.SetMeta("mesh_static", info.subMeshCount != 0);
                 components.Add(meshInst);
                 if (rootBoneFileId.HasValue)
-                    rootBonePath = GetPathTo(reader.GetNodeByTransformComponentId(rootBoneFileId.Value));
+                    Parent.rootBonePaths.Add(Parent.GetPathTo(reader.GetNodeByTransformComponentId(rootBoneFileId.Value)));
                 if (boneFileIds.Count != 0)
                 {
                     Skeleton3D skel = new Skeleton3D();
@@ -258,20 +252,25 @@ namespace Hypernex.GodotVersion.UnityLoader
                             var idx = boneFileIds.IndexOf(curNode.fileId);
                             if (idx == -1)
                                 break;
+                            if (idx >= bindPoses.Count)
+                                break;
                             binds.Add(bindPoses[idx]);
                             if (!IsInstanceValid(curNode.Parent))
                                 break;
                             curNode = curNode.Parent;
                         }
-                        var bind = binds[0].AffineInverse();
-                        if (binds.Count > 1)
+                        if (binds.Count > 0)
                         {
-                            bind = (binds[0] * binds[1].AffineInverse()).AffineInverse();
+                            var bind = binds[0].AffineInverse();
+                            if (binds.Count > 1)
+                            {
+                                bind = (binds[0] * binds[1].AffineInverse()).AffineInverse();
+                            }
+                            if (BundleReader.flipZ)
+                                xform = Transform3D.FlipZ * bind * Transform3D.FlipZ;
+                            else
+                                xform = bind;
                         }
-                        if (BundleReader.flipZ)
-                            xform = Transform3D.FlipZ * bind * Transform3D.FlipZ;
-                        else
-                            xform = bind;
                         skel.SetBoneRest(boneIdx, xform);
                         skel.SetBonePose(boneIdx, xform);
                     }
@@ -287,12 +286,14 @@ namespace Hypernex.GodotVersion.UnityLoader
                     skel.AddChild(meshInst, true);
                     meshInst.Skin = skel.CreateSkinFromRestTransforms();
                     meshInst.Skeleton = meshInst.GetPathTo(skel);
-                    if (IsInstanceValid(Parent.GetComponent<Skeleton3D>()))
-                        components.Add(skel);
-                    else
+                    if (IsInstanceValid(Parent.GetComponent<AnimationPlayer>()))
                     {
                         components.Add(skel);
                         // Parent.components.Add(skel);
+                    }
+                    else
+                    {
+                        components.Add(skel);
                     }
                     // skel.ShowRestOnly = true; // debug
                 }
@@ -301,29 +302,35 @@ namespace Hypernex.GodotVersion.UnityLoader
                     AddChild(meshInst);
                 }
             }
-            if (IsInstanceValid(shape))
+            if (hasRigidbody)
             {
-                CollisionObject3D body = shapeTrigger ? new Area3D() : new StaticBody3D();
+                components.Add(new RigidBody3D());
+            }
+            foreach (var info in shapes)
+            {
+                CollisionObject3D body = info.shapeTrigger ? new Area3D() : hasRigidbody ? GetComponent<RigidBody3D>() : new StaticBody3D();
                 CollisionShape3D collision = new CollisionShape3D();
-                collision.Shape = shape;
+                collision.Shape = info.shape;
                 components.Add(body);
                 AddChild(body);
                 components.Add(collision);
                 body.AddChild(collision);
-                collision.Position = shapeCenter;
-                collision.Disabled = !shapeEnabled;
+                collision.Position = info.shapeCenter;
+                collision.Disabled = !info.shapeEnabled;
             }
-            if (IsInstanceValid(audioStream))
+            foreach (var info in audios)
             {
                 AudioStreamPlayer3D player = new AudioStreamPlayer3D();
                 components.Add(player);
                 AddChild(player);
                 player.AttenuationFilterDb = 0f;
-                player.AttenuationModel = attenuation;
-                player.VolumeDb = audioVolumeDb;
-                player.MaxDistance = audioMaxDistance;
-                player.PanningStrength = audioPan;
-                player.Stream = audioStream;
+                player.AttenuationModel = info.attenuation;
+                player.VolumeDb = info.audioVolumeDb;
+                player.MaxDistance = info.audioMaxDistance;
+                player.PanningStrength = info.audioPan;
+                player.Stream = info.audioStream;
+                player.Autoplay = info.autoPlayAudio;
+                player.SetMeta("audio_loop", info.loopAudio);
             }
             if (assetAnimatorField.info != null)
             {
@@ -362,6 +369,11 @@ namespace Hypernex.GodotVersion.UnityLoader
             return components.FirstOrDefault(x => x is T) as T;
         }
 
+        public T[] GetComponents<T>() where T : Node
+        {
+            return components.Where(x => x is T).Select(x => x as T).ToArray();
+        }
+
         public HolderNode FindChildTransform(string name)
         {
             return GetChildren().FirstOrDefault(x => x is HolderNode && x.Name == name.ValidateNodeName()) as HolderNode;
@@ -374,17 +386,33 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public override void _Ready()
         {
+            var rb = GetComponent<RigidBody3D>();
+            if (IsInstanceValid(rb))
+            {
+                rb.TopLevel = true;
+                rb.GlobalTransform = GlobalTransform;
+                AddChild(new PhysNode());
+            }
             foreach (MeshInstance3D comp in components.Where(x => x is MeshInstance3D))
             {
-                if (subMeshCount != 0)
+                if (comp.HasMeta("mesh_static") && comp.GetMeta("mesh_static").AsBool())
                     comp.GlobalTransform = Transform3D.Identity;
             }
             foreach (AudioStreamPlayer3D comp in components.Where(x => x is AudioStreamPlayer3D))
             {
-                if (autoPlayAudio)
+                if (comp.Autoplay)
                     comp.Play();
-                if (loopAudio)
+                if (comp.HasMeta("audio_loop") && comp.GetMeta("audio_loop").AsBool())
                     comp.Finished += () => comp.Play();
+            }
+            var anim = GetComponent<AnimationPlayer>();
+            if (IsInstanceValid(anim) || GetComponents<Skeleton3D>().Length != 0 || rootBonePaths.Count != 0)
+            {
+                AddChild(new SkinnedNode());
+            }
+            foreach (var probe in GetComponents<ReflectionProbe>())
+            {
+                probe.GlobalBasis = Basis.Identity;
             }
 
             return;
@@ -400,49 +428,69 @@ namespace Hypernex.GodotVersion.UnityLoader
             // */
         }
 
+        /*
+        public override void _PhysicsProcess(double delta)
+        {
+            if (!hasRigidbody)
+                return;
+            var rb = GetComponent<RigidBody3D>();
+            if (IsInstanceValid(rb))
+            {
+                GlobalTransform = rb.GlobalTransform;
+            }
+        }
+        */
+
+        /*
         public override void _Process(double delta)
         {
             var anim = GetComponent<AnimationPlayer>();
             if (IsInstanceValid(anim) && !anim.IsPlaying())
             {
-                anim.Play(anim.GetAnimationList().First());
+                // anim.Play(anim.GetAnimationList().First());
             }
-            var skel = GetComponent<Skeleton3D>();
-            if (IsInstanceValid(skel))
+            foreach (var skel in GetComponents<Skeleton3D>())
             {
-                if (IsInstanceValid(anim))
+                if (IsInstanceValid(skel))
                 {
-                    foreach (var kvp in humanBoneAxes)
+                    if (IsInstanceValid(anim))
                     {
-                        var bone = GetNode<HolderNode>(kvp.Key);
-                        int idx = skel.FindBone(kvp.Value.humanBoneName);
-                        if (idx != -1)
+                        foreach (var kvp in humanBoneAxes)
                         {
-                            var xform = skel.GetBonePose(idx);
-                            bone.Transform = xform;
+                            var bone = GetNode<HolderNode>(kvp.Key);
+                            int idx = skel.FindBone(kvp.Value.humanBoneName);
+                            if (idx != -1)
+                            {
+                                var xform = skel.GetBonePose(idx);
+                                bone.Transform = xform;
+                            }
+                            else
+                            {
+                                bone.Transform = kvp.Value.xform;
+                            }
                         }
-                        else
+                    }
+                    else
+                    {
+                        foreach (var kvp in skeletonBoneMap)
                         {
-                            bone.Transform = kvp.Value.xform;
+                            var node = GetNode<HolderNode>(kvp.Key);
+                            var xform = node.Transform;
+                            skel.SetBonePose(kvp.Value, xform);
                         }
                     }
                 }
-                else
-                {
-                    foreach (var kvp in skeletonBoneMap)
-                    {
-                        var node = GetNode<HolderNode>(kvp.Key);
-                        var xform = node.Transform;
-                        skel.SetBonePose(kvp.Value, xform);
-                    }
-                }
             }
-            var root = GetNodeOrNull<Node3D>(rootBonePath);
-            if (IsInstanceValid(root) && false)
+            foreach (var rootPath in rootBonePaths)
             {
-                root.Position = rootBonePosition * new Vector3(1f, 1f, BundleReader.zFlipper);
-                root.Quaternion = HumanTrait.FlipZ(rootBoneRotation);
-                root.Scale = rootBoneScale;
+                var root = GetNodeOrNull<Node3D>(rootPath);
+                if (IsInstanceValid(root))
+                {
+                    root.Position = rootBonePosition * new Vector3(1f, 1f, BundleReader.zFlipper);
+                    root.Quaternion = HumanTrait.FlipZ(rootBoneRotation);
+                    if (!rootBoneScale.IsZeroApprox())
+                        root.Scale = rootBoneScale;
+                }
             }
             if (IsInstanceValid(anim))
             {
@@ -450,5 +498,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                 HumanTrait.ApplyBones(this);
             }
         }
+        */
     }
 }

@@ -132,7 +132,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                     axes.position = GetVector3(humanSkeletonPose[i]["t"]);
                     axes.rotation = GetQuaternion(humanSkeletonPose[i]["q"]);
                     axes.scale = GetVector3NoFlip(humanSkeletonPose[i]["s"]);
-                    hashToNode[data].Transform = axes.xform;
                     node.humanBoneAxes.TryAdd(node.GetPathTo(hashToNode[data]), axes);
                     // var hName = HumanTrait.BoneName[i];
                     string hName = null;
@@ -175,7 +174,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                     axes.position = GetVector3(human2SkeletonPose[i]["t"]);
                     axes.rotation = GetQuaternion(human2SkeletonPose[i]["q"]);
                     axes.scale = GetVector3NoFlip(human2SkeletonPose[i]["s"]);
-                    hashToNode[data].Transform = axes.xform;
                     node.boneToNode.TryAdd(hashToNode[data].Name, path);
                 }
             }
@@ -250,7 +248,10 @@ namespace Hypernex.GodotVersion.UnityLoader
                 }
                 if (bindings.ContainsKey(key))
                 {
-                    NodePath trackPath = node.GetPathTo(target) + ":" + bindings[key].Set(attribute, values, offset, false);
+                    string propPath = bindings[key].Set(attribute, values, offset, false);
+                    if (string.IsNullOrEmpty(propPath))
+                        continue;
+                    NodePath trackPath = node.GetPathTo(target) + ":" + propPath;
                     if (!tracks.ContainsKey(key))
                         tracks.Add(key, new Dictionary<NodePath, int>());
                     if (!tracks[key].ContainsKey(trackPath))
@@ -279,12 +280,15 @@ namespace Hypernex.GodotVersion.UnityLoader
                     }
                     HolderNode target = binders[key];
                     string path = bindings[key].Set(attribute, values, offset, true);
-                    NodePath trackPath = node.GetPathTo(target) + ":" + path;
-                    if (tracks.ContainsKey(key) && tracks[key].ContainsKey(trackPath))
+                    if (!string.IsNullOrEmpty(path))
                     {
-                        // int j = anim.TrackFindKey(tracks[key][trackPath], time, Animation.FindMode.Approx);
-                        // if (j != -1)
-                        //     anim.TrackInsertKey(tracks[key][trackPath], time, target.Get(path));
+                        NodePath trackPath = node.GetPathTo(target) + ":" + path;
+                        if (tracks.ContainsKey(key) && tracks[key].ContainsKey(trackPath))
+                        {
+                            // int j = anim.TrackFindKey(tracks[key][trackPath], time, Animation.FindMode.Approx);
+                            // if (j != -1)
+                            //     anim.TrackInsertKey(tracks[key][trackPath], time, target.Get(path));
+                        }
                     }
                     offset += typeId == 4 ? (uint)(attribute == 2 ? 4 : 3) : 1;
                 }
