@@ -142,6 +142,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 if (!IsInstanceValid(m))
                     continue;
                 MeshInstance3D meshInst = new MeshInstance3D();
+                meshInst.CastShadow = info.shadows;
                 meshInst.Visible = info.visible;
                 meshInst.Mesh = m;
                 if (info.subMeshCount == 0)

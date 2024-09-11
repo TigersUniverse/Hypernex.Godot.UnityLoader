@@ -14,6 +14,8 @@ namespace Hypernex.GodotVersion.UnityLoader
         [Export]
         public ushort subMeshCount = 0;
         [Export]
+        public GeometryInstance3D.ShadowCastingSetting shadows = GeometryInstance3D.ShadowCastingSetting.On;
+        [Export]
         public Array<Material> materials = new Array<Material>();
     }
 }

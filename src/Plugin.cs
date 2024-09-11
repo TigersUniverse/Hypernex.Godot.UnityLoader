@@ -1,4 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using Godot;
 using Hypernex.CCK;
 using Hypernex.CCK.GodotVersion;
@@ -16,8 +20,19 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public override void OnPluginLoaded()
         {
+            NativeLibrary.SetDllImportResolver(typeof(Tracy.PInvoke).Assembly, TracyResolver);
             Init.WorldProvider = UnitySceneProvider;
             // Init.AvatarProvider = UnitySceneProvider;
+            Profiler.ProfileFrame(nameof(OnPluginLoaded));
+        }
+
+        private IntPtr TracyResolver(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
+        {
+            if (libraryName.Equals("TracyClient"))
+            {
+                return NativeLibrary.Load(Path.GetFullPath(Path.Combine(assembly.Location, "..", "runtimes", libraryName)));
+            }
+            return IntPtr.Zero;
         }
 
         public ISceneProvider UnitySceneProvider()

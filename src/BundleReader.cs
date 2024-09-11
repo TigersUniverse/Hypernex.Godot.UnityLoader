@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using AssetsTools.NET;
@@ -26,6 +27,14 @@ namespace Hypernex.GodotVersion.UnityLoader
         public AssetsManager mgr;
         public BundleFileInstance bundleFile;
 
+#region Bindings
+        public int Transform_m_GameObject = -1;
+        public int Transform_m_Father = -1;
+        public int Transform_m_LocalPosition = -1;
+        public int Transform_m_LocalRotation = -1;
+        public int Transform_m_LocalScale = -1;
+#endregion
+
         public static bool flipZ = true;
 
         public static float zFlipper => flipZ ? -1f : 1f;
@@ -34,9 +43,13 @@ namespace Hypernex.GodotVersion.UnityLoader
         {
             public int fileId;
             public long pathId;
+            public int variant = 0;
 
             public AssetInfo(AssetTypeValueField field)
             {
+                fileId = field[0].AsInt;
+                pathId = field[1].AsLong;
+                return;
                 fileId = field["m_FileID"].AsInt;
                 pathId = field["m_PathID"].AsLong;
             }
@@ -70,6 +83,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             scene = null;
             ReadFile(filePath);
             // ResourceSaver.Save(scene, "res://temp/scene.scn", ResourceSaver.SaverFlags.BundleResources);
+            Profiler.ProfileFrame(nameof(LoadFromFile));
             return scene;
         }
 
@@ -79,8 +93,13 @@ namespace Hypernex.GodotVersion.UnityLoader
                 return;
             var aFile = aFileInst.file;
 
-            List<HolderNode> nodes = new List<HolderNode>();
-            foreach (var obj in aFile.GetAssetsOfType(AssetClassID.GameObject))
+            var gameObjects = aFile.GetAssetsOfType(AssetClassID.GameObject);
+            // List<HolderNode> nodes = new List<HolderNode>(gameObjects.Count);
+            HolderNode[] nodes = new HolderNode[gameObjects.Count];
+            var sw = new Stopwatch();
+            sw.Start();
+            int index = 0;
+            foreach (var obj in gameObjects)
             {
                 var goBase = mgr.GetBaseField(aFileInst, obj);
                 var name = goBase["m_Name"].AsString;
@@ -93,11 +112,15 @@ namespace Hypernex.GodotVersion.UnityLoader
                 foreach (var data in components)
                 {
                     var componentPtr = data["component"];
-                    var componentExtInfo = mgr.GetExtAsset(aFileInst, componentPtr);
+                    var componentExtInfo = mgr.GetExtAsset(aFileInst, componentPtr, true);
                     ConvertComponent(zippath, node, mgr, componentExtInfo.file, componentPtr, componentExtInfo);
                 }
-                nodes.Add(node);
+                // nodes.Add(node);
+                nodes[index] = node;
+                index++;
             }
+            sw.Stop();
+            GD.Print($"Loaded {sw.ElapsedMilliseconds}ms");
             foreach (var obj in aFile.GetAssetsOfType(AssetClassID.RenderSettings))
             {
                 var baseField = mgr.GetBaseField(aFileInst, obj);
@@ -105,6 +128,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                 var skyboxMatInfo = mgr.GetExtAsset(aFileInst, skyboxMatPtr);
                 var env = new Godot.Environment();
                 env.BackgroundMode = Godot.Environment.BGMode.Sky;
+                env.ReflectedLightSource = Godot.Environment.ReflectionSource.Bg;
+                env.AmbientLightSource = Godot.Environment.AmbientSource.Bg;
                 env.Sky = new Sky();
                 if (skyboxMatInfo.info != null)
                     env.Sky.SkyMaterial = GetSkyMaterial(zippath, mgr, skyboxMatInfo.file, skyboxMatInfo.baseField);
@@ -114,26 +139,27 @@ namespace Hypernex.GodotVersion.UnityLoader
                 worldEnv.Environment = env;
                 root.AddChild(worldEnv);
             }
+            var nodesList = new List<HolderNode>(nodes);
             allNodes = new List<HolderNode>(nodes);
             int prevNodeCount = 0;
-            while (prevNodeCount != nodes.Count)
+            while (prevNodeCount != nodesList.Count)
             {
-                prevNodeCount = nodes.Count;
-                for (int j = 0; j < nodes.Count; j++)
+                prevNodeCount = nodesList.Count;
+                for (int j = 0; j < nodesList.Count; j++)
                 {
-                    if (nodes[j].parentFileId == null || nodes[j].parentFileId == 0)
+                    if (nodesList[j].parentFileId == null || nodesList[j].parentFileId == 0)
                     {
-                        root.AddChild(nodes[j], true);
-                        nodes.RemoveAt(j);
+                        root.AddChild(nodesList[j], true);
+                        nodesList.RemoveAt(j);
                         j--;
                     }
                     else
                     {
-                        var parent = allNodes.FirstOrDefault(x => x.fileId == nodes[j].parentFileId.GetValueOrDefault());
+                        var parent = allNodes.FirstOrDefault(x => x.fileId == nodesList[j].parentFileId.GetValueOrDefault());
                         if (parent != null)
                         {
-                            parent.AddChild(nodes[j], true);
-                            nodes.RemoveAt(j);
+                            parent.AddChild(nodesList[j], true);
+                            nodesList.RemoveAt(j);
                             j--;
                         }
                     }
@@ -175,6 +201,10 @@ namespace Hypernex.GodotVersion.UnityLoader
                 root.Basis = Basis.FlipZ;
             }
             mgr = new AssetsManager();
+            mgr.UseQuickLookup = true;
+            mgr.UseTemplateFieldCache = true;
+            mgr.UseMonoTemplateFieldCache = true;
+            mgr.UseRefTypeManagerCache = true;
             try
             {
                 bundleFile = mgr.LoadBundleFile(path, true);
@@ -196,7 +226,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 List<string> names = bundleFile.file.GetAllFileNames();
                 for (int i = 0; i < names.Count; i++)
                 {
-                    var aFileInst = mgr.LoadAssetsFileFromBundle(bundleFile, bundleFile.file.GetFileIndex(names[i]), true);
+                    var aFileInst = mgr.LoadAssetsFileFromBundle(bundleFile, bundleFile.file.GetFileIndex(names[i]), false);
                     ParseAssetsFileInstance(mgr, aFileInst);
                 }
             }
@@ -242,8 +272,28 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public void ConvertComponent(string zippath, HolderNode node, AssetsManager manager, AssetsFileInstance fileInst, AssetTypeValueField componentPtr, AssetExternal componentExtInfo)
         {
-            var compBase = componentExtInfo.baseField;
             var componentType = (AssetClassID)componentExtInfo.info.TypeId;
+            switch (componentType)
+            {
+                case AssetClassID.Transform:
+                case AssetClassID.Animator:
+                case AssetClassID.MeshFilter:
+                case AssetClassID.SkinnedMeshRenderer:
+                case AssetClassID.MeshRenderer:
+                case AssetClassID.MeshCollider:
+                case AssetClassID.BoxCollider:
+                case AssetClassID.SphereCollider:
+                case AssetClassID.CapsuleCollider:
+                case AssetClassID.AudioSource:
+                case AssetClassID.Light:
+                case AssetClassID.ReflectionProbe:
+                case AssetClassID.Rigidbody:
+                    break;
+                default:
+                    return;
+            }
+            using var _ = Profiler.BeginEvent($"{nameof(ConvertComponent)} {componentType}");
+            var compBase = manager.GetBaseField(fileInst, componentExtInfo.info);
             switch (componentType)
             {
                 case AssetClassID.Transform:
@@ -269,24 +319,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                 case AssetClassID.MeshFilter:
                 {
                     var meshPtr = compBase["m_Mesh"];
-                    var meshAsset = manager.GetExtAsset(fileInst, meshPtr);
-                    // GD.PrintS(node.Name, meshAsset.info == null);
-                    if (meshAsset.info == null)
-                    {
-                        if (TryGetBuiltinMesh(manager, fileInst, meshPtr, out var m))
-                            node.mesh = m;
-                        break;
-                    }
-                    var pathId = new AssetInfo(meshPtr);
-                    if (assets.TryGetValue(pathId, out var val))
-                        node.mesh = val as Mesh;
-                    else
-                    {
-                        ArrayMesh mesh = GetMesh(zippath, meshAsset.file, meshAsset.baseField);
-                        // GD.PrintS(node.Name, mesh.ResourceName, mesh.GetSurfaceCount());
-                        assets.Add(pathId, mesh);
-                        node.mesh = mesh;
-                    }
+                    Mesh mesh = TryGetMesh(zippath, manager, fileInst, meshPtr);
+                    node.mesh = mesh;
                     break;
                 }
                 case AssetClassID.SkinnedMeshRenderer:
@@ -295,41 +329,21 @@ namespace Hypernex.GodotVersion.UnityLoader
                     // mesh
                     {
                         var meshPtr = compBase["m_Mesh"];
+                        Mesh mesh = TryGetMesh(zippath, manager, fileInst, meshPtr);
                         var meshAsset = manager.GetExtAsset(fileInst, meshPtr);
                         if (meshAsset.info == null)
                         {
                             break;
                         }
-                        var pathId = new AssetInfo(meshPtr);
-                        if (assets.TryGetValue(pathId, out var val))
-                            info.mesh = val as Mesh;
-                        else
-                        {
-                            ArrayMesh mesh = GetMesh(zippath, meshAsset.file, meshAsset.baseField);
-                            assets.Add(pathId, mesh);
-                            info.mesh = mesh;
-                            node.bindPoses = GetMeshBindPose(zippath, meshAsset.file, meshAsset.baseField);
-                        }
+                        info.mesh = mesh;
+                        node.bindPoses = GetMeshBindPose(zippath, meshAsset.file, meshAsset.baseField);
                     }
                     // materials
                     var materials = compBase["m_Materials.Array"];
                     foreach (var matPtr in materials)
                     {
-                        var matAsset = manager.GetExtAsset(fileInst, matPtr);
-                        if (matAsset.info == null)
-                        {
-                            info.materials.Add(null);
-                            continue;
-                        }
-                        var pathId = new AssetInfo(matPtr);
-                        if (assets.TryGetValue(pathId, out var val))
-                            info.materials.Add(val as Material);
-                        else
-                        {
-                            Material mat = GetStandardMaterial(zippath, manager, matAsset.file, matAsset.baseField);
-                            info.materials.Add(mat);
-                            assets.Add(pathId, mat);
-                        }
+                        Material mat = TryGetStandardMaterial(zippath, manager, fileInst, matPtr);
+                        info.materials.Add(mat);
                     }
                     // bones
                     node.rootBoneFileId = compBase["m_RootBone.m_PathID"].AsLong;
@@ -345,26 +359,30 @@ namespace Hypernex.GodotVersion.UnityLoader
                 {
                     MeshInfo info = new MeshInfo();
                     var materials = compBase["m_Materials.Array"];
+                    GeometryInstance3D.ShadowCastingSetting sh = GeometryInstance3D.ShadowCastingSetting.On;
+                    switch (compBase["m_CastShadows"].AsByte)
+                    {
+                        case 0:
+                            sh = GeometryInstance3D.ShadowCastingSetting.Off;
+                            break;
+                        case 1:
+                            sh = GeometryInstance3D.ShadowCastingSetting.On;
+                            break;
+                        case 2:
+                            sh = GeometryInstance3D.ShadowCastingSetting.DoubleSided;
+                            break;
+                        case 3:
+                            sh = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly;
+                            break;
+                    }
+                    info.shadows = sh;
                     info.visible = compBase["m_Enabled"].AsBool;
                     info.firstSubmesh = compBase["m_StaticBatchInfo.firstSubMesh"].AsUShort;
                     info.subMeshCount = compBase["m_StaticBatchInfo.subMeshCount"].AsUShort;
                     foreach (var matPtr in materials)
                     {
-                        var matAsset = manager.GetExtAsset(fileInst, matPtr);
-                        if (matAsset.info == null)
-                        {
-                            info.materials.Add(null);
-                            continue;
-                        }
-                        var pathId = new AssetInfo(matPtr);
-                        if (assets.TryGetValue(pathId, out var val))
-                            info.materials.Add(val as Material);
-                        else
-                        {
-                            Material mat = GetStandardMaterial(zippath, manager, matAsset.file, matAsset.baseField);
-                            info.materials.Add(mat);
-                            assets.Add(pathId, mat);
-                        }
+                        Material mat = TryGetStandardMaterial(zippath, manager, fileInst, matPtr);
+                        info.materials.Add(mat);
                     }
                     node.meshes.Add(info);
                     break;
@@ -373,40 +391,13 @@ namespace Hypernex.GodotVersion.UnityLoader
                 {
                     ShapeInfo info = new ShapeInfo();
                     var meshPtr = compBase["m_Mesh"];
-                    var meshAsset = manager.GetExtAsset(fileInst, meshPtr);
-                    if (meshAsset.info == null)
+                    Mesh mesh = TryGetMesh(zippath, manager, fileInst, meshPtr);
+                    if (GodotObject.IsInstanceValid(mesh))
                     {
-                        if (TryGetBuiltinMesh(manager, fileInst, meshPtr, out var mesh))
-                        {
-                            if (GodotObject.IsInstanceValid(mesh))
-                            {
-                                if (compBase["m_Convex"].AsBool)
-                                    info.shape = mesh.CreateConvexShape();
-                                else
-                                    info.shape = mesh.CreateTrimeshShape();
-                            }
-                        }
+                        if (compBase["m_Convex"].AsBool)
+                            info.shape = mesh.CreateConvexShape(false);
                         else
-                            break;
-                    }
-                    else
-                    {
-                        var pathId = new AssetInfo(meshPtr);
-                        Mesh mesh;
-                        if (assets.TryGetValue(pathId, out var val))
-                            mesh = val as Mesh;
-                        else
-                        {
-                            mesh = GetMesh(zippath, meshAsset.file, meshAsset.baseField);
-                            assets.Add(pathId, mesh);
-                        }
-                        if (GodotObject.IsInstanceValid(mesh))
-                        {
-                            if (compBase["m_Convex"].AsBool)
-                                info.shape = mesh.CreateConvexShape();
-                            else
-                                info.shape = mesh.CreateTrimeshShape();
-                        }
+                            info.shape = mesh.CreateTrimeshShape();
                     }
                     info.shapeCenter = Vector3.Zero;
                     info.shapeEnabled = compBase["m_Enabled"].AsBool;
@@ -543,7 +534,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                 {
                     ReflectionProbe probe = new ReflectionProbe();
                     probe.UpdateMode = ReflectionProbe.UpdateModeEnum.Always;
-                    probe.BoxProjection = true;
+                    probe.BoxProjection = compBase["m_BoxProjection"].AsBool;
+                    probe.AmbientMode = ReflectionProbe.AmbientModeEnum.Environment;
                     probe.OriginOffset = GetVector3(compBase["m_BoxOffset"]);
                     probe.Size = GetVector3NoFlip(compBase["m_BoxSize"]);
                     probe.MaxDistance = probe.Size.Length() * 2f;
@@ -559,6 +551,45 @@ namespace Hypernex.GodotVersion.UnityLoader
                     break;
                 }
             }
+        }
+
+        public Mesh TryGetMesh(string zippath, AssetsManager manager, AssetsFileInstance fileInstance, AssetTypeValueField ptrField)
+        {
+            using var _ = Profiler.BeginEvent();
+            var pathId = new AssetInfo(ptrField);
+            if (assets.TryGetValue(pathId, out var val))
+                return val as ArrayMesh;
+            var asset = manager.GetExtAsset(fileInstance, ptrField);
+            if (asset.info == null)
+            {
+                if (TryGetBuiltinMesh(manager, fileInstance, ptrField, out var b))
+                {
+                    assets.Add(pathId, b);
+                    return b;
+                }
+                assets.Add(pathId, null);
+                return null;
+            }
+            ArrayMesh m = GetMesh(zippath, asset.file, asset.baseField);
+            assets.Add(pathId, m);
+            return m;
+        }
+
+        public StandardMaterial3D TryGetStandardMaterial(string zippath, AssetsManager manager, AssetsFileInstance fileInstance, AssetTypeValueField ptrField)
+        {
+            using var _ = Profiler.BeginEvent();
+            var pathId = new AssetInfo(ptrField);
+            if (assets.TryGetValue(pathId, out var val))
+                return val as StandardMaterial3D;
+            var asset = manager.GetExtAsset(fileInstance, ptrField);
+            if (asset.info == null)
+            {
+                assets.Add(pathId, null);
+                return null;
+            }
+            StandardMaterial3D m = GetStandardMaterial(zippath, manager, asset.file, asset.baseField);
+            assets.Add(pathId, m);
+            return m;
         }
 
         public static bool TryGetBuiltinMesh(AssetsManager manager, AssetsFileInstance fileInstance, AssetTypeValueField field, out Mesh mesh)
@@ -979,6 +1010,7 @@ namespace Hypernex.GodotVersion.UnityLoader
         {
             StandardMaterial3D material = new StandardMaterial3D();
             material.ResourceName = field["m_Name"].AsString;
+            using var _ = Profiler.BeginEvent($"{nameof(GetStandardMaterial)} {material.ResourceName}");
             loadedResources[zippath].Add(material);
             // material.VertexColorUseAsAlbedo = true;
             if (!flipZ)
@@ -995,6 +1027,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                         material.Transparency = BaseMaterial3D.TransparencyEnum.AlphaDepthPrePass;
                 }
             }
+            int roughnessTextureSource = 0;
             foreach (var flKvp in field["m_SavedProperties.m_Floats.Array"])
             {
                 var propName = flKvp["first"].AsString;
@@ -1009,6 +1042,9 @@ namespace Hypernex.GodotVersion.UnityLoader
                         break;
                     case "_SpecularHighlights":
                         // material.MetallicSpecular = fl;
+                        break;
+                    case "_SmoothnessTextureChannel":
+                        roughnessTextureSource = Mathf.RoundToInt(fl);
                         break;
                 }
             }
@@ -1043,13 +1079,16 @@ namespace Hypernex.GodotVersion.UnityLoader
                 else
                 {
                     var img = GetImage(zippath, fileInst, texAsset.baseField, out var transparent, out var texFile);
-                    texture = ImageTexture.CreateFromImage(img);
+                    if (GodotObject.IsInstanceValid(img))
+                    {
+                        texture = ImageTexture.CreateFromImage(img);
+                        loadedResources[zippath].Add(img);
+                    }
                     assets.Add(info, texture);
-                    loadedResources[zippath].Add(img);
                     loadedResources[zippath].Add(texture);
                     created = true;
                 }
-                if (texture == null)
+                if (!GodotObject.IsInstanceValid(texture))
                     continue;
                 loadedResources[zippath].Add(texture);
                 var scale = GetVector2(texKvp["second.m_Scale"]);
@@ -1064,10 +1103,44 @@ namespace Hypernex.GodotVersion.UnityLoader
                     {
                         material.TextureFilter = BaseMaterial3D.TextureFilterEnum.NearestWithMipmaps;
                     }
+                    if (roughnessTextureSource == 1)
+                    {
+                        info.variant = 1;
+                        ImageTexture texture2 = null;
+                        if (assets.TryGetValue(info, out var texRes))
+                        {
+                            texture2 = texRes as ImageTexture;
+                        }
+                        else
+                        {
+                            var tex = SwapColorsRoughness(texture.GetImage());
+                            texture2 = ImageTexture.CreateFromImage(tex);
+                            assets.Add(info, texture2);
+                        }
+                        material.RoughnessTexture = texture2;
+                        material.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Alpha;
+                    }
                 }
                 else if (propName.Contains("Metallic", StringComparison.OrdinalIgnoreCase))
                 {
                     material.MetallicTexture = texture;
+                    if (roughnessTextureSource == 0)
+                    {
+                        info.variant = 1;
+                        ImageTexture texture2 = null;
+                        if (assets.TryGetValue(info, out var texRes))
+                        {
+                            texture2 = texRes as ImageTexture;
+                        }
+                        else
+                        {
+                            var tex = SwapColorsRoughness(texture.GetImage());
+                            texture2 = ImageTexture.CreateFromImage(tex);
+                            assets.Add(info, texture2);
+                        }
+                        material.RoughnessTexture = texture2;
+                        material.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Alpha;
+                    }
                 }
                 else if (propName.Contains("SpecGloss", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1077,6 +1150,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                         texture.Update(tex);
                     }
                     material.RoughnessTexture = texture;
+                    material.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Alpha;
                 }
                 else if (propName.Contains("Normal", StringComparison.OrdinalIgnoreCase) || propName.Contains("Bump", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1133,12 +1207,11 @@ namespace Hypernex.GodotVersion.UnityLoader
                 dims.Add(meshType, dimension);
             }
             var totalVertexCount = field["m_VertexData.m_VertexCount"].AsUInt;
-            var rawData = field["m_VertexData.m_DataSize"].AsByteArray;
-            if (rawData.Length == 0)
+            var data = field["m_VertexData.m_DataSize"].AsByteArray;
+            if (data.Length == 0)
             {
-                rawData = ReadStreamedData(fileInst, field["m_StreamData"], false);
+                data = ReadStreamedData(fileInst, field["m_StreamData"], false);
             }
-            byte[] data = rawData;
             if (fileInst.file.Header.Endianness != BitConverter.IsLittleEndian)
             {
                 // Array.Reverse(data);
@@ -1148,6 +1221,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             var subMeshes = field["m_SubMeshes.Array"];
             ArrayMesh mesh = new ArrayMesh();
             mesh.ResourceName = field["m_Name"].AsString;
+            using var _ = Profiler.BeginEvent($"{nameof(GetMesh)} {mesh.ResourceName}");
             loadedResources[zippath].Add(mesh);
             if (totalVertexCount == 0)
                 return mesh;
@@ -1354,13 +1428,13 @@ namespace Hypernex.GodotVersion.UnityLoader
             transparent = false;
             file = null;
             if (field == null || field.IsDummy)
-                return Image.CreateEmpty(64, 64, false, Image.Format.R8);
+                return null;
             file = TextureFile.ReadTextureFile(field);
             if (file == null)
-                return Image.CreateEmpty(64, 64, false, Image.Format.R8);
+                return null;
             byte[] data = file.GetTextureData(fileInst);
             if (data == null)
-                return Image.CreateEmpty(64, 64, false, Image.Format.R8);
+                return null;
             for (int i = 0; i < data.Length; i+=4)
             {
                 byte b = data[i];
@@ -1377,7 +1451,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 }
             }
             Image img = Image.CreateFromData(file.m_Width, file.m_Height, false, Image.Format.Rgba8, data);
-            img.Resize(512, 512, Image.Interpolation.Nearest);
+            // img.Resize(512, 512, Image.Interpolation.Nearest);
             img.GenerateMipmaps();
             return img;
         }
@@ -1435,7 +1509,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 data[i] = (byte)(byte.MaxValue - r);
                 data[i+1] = g;
                 data[i+2] = b;
-                data[i+3] = a;
+                data[i+3] = (byte)(byte.MaxValue - a);
             }
             Image img2 = Image.CreateFromData(img.GetWidth(), img.GetHeight(), true, Image.Format.Rgba8, data);
             // img2.GenerateMipmaps();
