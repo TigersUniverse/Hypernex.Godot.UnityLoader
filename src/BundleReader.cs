@@ -23,7 +23,7 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public Func<BundleReader, string, HolderNode, AssetsManager, AssetsFileInstance, AssetTypeValueField, Node> typeMappings = (_, _, _, _, _, _) => null;
 
-        public Dictionary<AssetInfo, Resource> assets = new Dictionary<AssetInfo, Resource>();
+        public Dictionary<long, Resource> assets = new Dictionary<long, Resource>();
         public AssetsManager mgr;
         public BundleFileInstance bundleFile;
 
@@ -47,11 +47,13 @@ namespace Hypernex.GodotVersion.UnityLoader
 
             public AssetInfo(AssetTypeValueField field)
             {
-                fileId = field[0].AsInt;
-                pathId = field[1].AsLong;
-                return;
                 fileId = field["m_FileID"].AsInt;
                 pathId = field["m_PathID"].AsLong;
+            }
+
+            public long GetHash()
+            {
+                return (int)(pathId << 16) + (ushort)(fileId << 8) + (ushort)variant;
             }
         }
 
@@ -557,21 +559,22 @@ namespace Hypernex.GodotVersion.UnityLoader
         {
             using var _ = Profiler.BeginEvent();
             var pathId = new AssetInfo(ptrField);
-            if (assets.TryGetValue(pathId, out var val))
+            long hash = pathId.GetHash();
+            if (assets.TryGetValue(hash, out var val))
                 return val as ArrayMesh;
             var asset = manager.GetExtAsset(fileInstance, ptrField);
             if (asset.info == null)
             {
                 if (TryGetBuiltinMesh(manager, fileInstance, ptrField, out var b))
                 {
-                    assets.Add(pathId, b);
+                    assets.Add(hash, b);
                     return b;
                 }
-                assets.Add(pathId, null);
+                assets.Add(hash, null);
                 return null;
             }
             ArrayMesh m = GetMesh(zippath, asset.file, asset.baseField);
-            assets.Add(pathId, m);
+            assets.Add(hash, m);
             return m;
         }
 
@@ -579,16 +582,17 @@ namespace Hypernex.GodotVersion.UnityLoader
         {
             using var _ = Profiler.BeginEvent();
             var pathId = new AssetInfo(ptrField);
-            if (assets.TryGetValue(pathId, out var val))
+            long hash = pathId.GetHash();
+            if (assets.TryGetValue(hash, out var val))
                 return val as StandardMaterial3D;
             var asset = manager.GetExtAsset(fileInstance, ptrField);
             if (asset.info == null)
             {
-                assets.Add(pathId, null);
+                assets.Add(hash, null);
                 return null;
             }
             StandardMaterial3D m = GetStandardMaterial(zippath, manager, asset.file, asset.baseField);
-            assets.Add(pathId, m);
+            assets.Add(hash, m);
             return m;
         }
 
@@ -1074,7 +1078,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                 ImageTexture texture = null;
                 bool created = false;
                 var info = new AssetInfo(texturePtr);
-                if (assets.TryGetValue(info, out var res))
+                long hash = info.GetHash();
+                if (assets.TryGetValue(hash, out var res))
                     texture = res as ImageTexture;
                 else
                 {
@@ -1084,7 +1089,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                         texture = ImageTexture.CreateFromImage(img);
                         loadedResources[zippath].Add(img);
                     }
-                    assets.Add(info, texture);
+                    assets.Add(hash, texture);
                     loadedResources[zippath].Add(texture);
                     created = true;
                 }
@@ -1106,8 +1111,9 @@ namespace Hypernex.GodotVersion.UnityLoader
                     if (roughnessTextureSource == 1)
                     {
                         info.variant = 1;
+                        hash = info.GetHash();
                         ImageTexture texture2 = null;
-                        if (assets.TryGetValue(info, out var texRes))
+                        if (assets.TryGetValue(hash, out var texRes))
                         {
                             texture2 = texRes as ImageTexture;
                         }
@@ -1115,7 +1121,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                         {
                             var tex = SwapColorsRoughness(texture.GetImage());
                             texture2 = ImageTexture.CreateFromImage(tex);
-                            assets.Add(info, texture2);
+                            assets.Add(hash, texture2);
                         }
                         material.RoughnessTexture = texture2;
                         material.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Alpha;
@@ -1127,8 +1133,9 @@ namespace Hypernex.GodotVersion.UnityLoader
                     if (roughnessTextureSource == 0)
                     {
                         info.variant = 1;
+                        hash = info.GetHash();
                         ImageTexture texture2 = null;
-                        if (assets.TryGetValue(info, out var texRes))
+                        if (assets.TryGetValue(hash, out var texRes))
                         {
                             texture2 = texRes as ImageTexture;
                         }
@@ -1136,7 +1143,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                         {
                             var tex = SwapColorsRoughness(texture.GetImage());
                             texture2 = ImageTexture.CreateFromImage(tex);
-                            assets.Add(info, texture2);
+                            assets.Add(hash, texture2);
                         }
                         material.RoughnessTexture = texture2;
                         material.RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Alpha;
