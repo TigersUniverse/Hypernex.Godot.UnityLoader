@@ -27,10 +27,10 @@ Items are listed in no particular order.
 - [x] Concave Mesh Collider
 - [x] Convex Mesh Collider
 - [x] Box Collider
-- [ ] Multiple Renderer/Collider components
-- [ ] Sphere Collider
-- [ ] Capsule Collider
-- [ ] Rigidbody
+- [x] Multiple Renderer/Collider components
+- [x] Sphere Collider
+- [x] Capsule Collider
+- [x] Rigidbody
 
 ### Hypernex.Unity/Misc. Types Roadmap
 
