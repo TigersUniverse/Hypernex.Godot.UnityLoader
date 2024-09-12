@@ -20,10 +20,8 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public override void OnPluginLoaded()
         {
-            NativeLibrary.SetDllImportResolver(typeof(Tracy.PInvoke).Assembly, TracyResolver);
             Init.WorldProvider = UnitySceneProvider;
             // Init.AvatarProvider = UnitySceneProvider;
-            Profiler.ProfileFrame(nameof(OnPluginLoaded));
         }
 
         private IntPtr TracyResolver(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)

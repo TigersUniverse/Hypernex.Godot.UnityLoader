@@ -9,7 +9,6 @@
     <PackageReference Include="Fmod5Sharp" Version="3.0.1" />
     <PackageReference Include="AssetsTools.NET" Version="3.0.0" />
     <PackageReference Include="AssetsTools.NET.Texture" Version="1.0.0" />
-    <PackageReference Include="Tracy-CSharp" Version="0.10.0.2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Hypernex.Godot\Hypernex.Godot\Hypernex.Godot.csproj" />

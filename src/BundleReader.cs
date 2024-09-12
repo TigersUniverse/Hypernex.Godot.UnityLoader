@@ -85,7 +85,6 @@ namespace Hypernex.GodotVersion.UnityLoader
             scene = null;
             ReadFile(filePath);
             // ResourceSaver.Save(scene, "res://temp/scene.scn", ResourceSaver.SaverFlags.BundleResources);
-            Profiler.ProfileFrame(nameof(LoadFromFile));
             return scene;
         }
 
@@ -294,7 +293,6 @@ namespace Hypernex.GodotVersion.UnityLoader
                 default:
                     return;
             }
-            using var _ = Profiler.BeginEvent($"{nameof(ConvertComponent)} {componentType}");
             var compBase = manager.GetBaseField(fileInst, componentExtInfo.info);
             switch (componentType)
             {
@@ -557,7 +555,6 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public Mesh TryGetMesh(string zippath, AssetsManager manager, AssetsFileInstance fileInstance, AssetTypeValueField ptrField)
         {
-            using var _ = Profiler.BeginEvent();
             var pathId = new AssetInfo(ptrField);
             long hash = pathId.GetHash();
             if (assets.TryGetValue(hash, out var val))
@@ -580,7 +577,6 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public StandardMaterial3D TryGetStandardMaterial(string zippath, AssetsManager manager, AssetsFileInstance fileInstance, AssetTypeValueField ptrField)
         {
-            using var _ = Profiler.BeginEvent();
             var pathId = new AssetInfo(ptrField);
             long hash = pathId.GetHash();
             if (assets.TryGetValue(hash, out var val))
@@ -1014,7 +1010,6 @@ namespace Hypernex.GodotVersion.UnityLoader
         {
             StandardMaterial3D material = new StandardMaterial3D();
             material.ResourceName = field["m_Name"].AsString;
-            using var _ = Profiler.BeginEvent($"{nameof(GetStandardMaterial)} {material.ResourceName}");
             loadedResources[zippath].Add(material);
             // material.VertexColorUseAsAlbedo = true;
             if (!flipZ)
@@ -1228,7 +1223,6 @@ namespace Hypernex.GodotVersion.UnityLoader
             var subMeshes = field["m_SubMeshes.Array"];
             ArrayMesh mesh = new ArrayMesh();
             mesh.ResourceName = field["m_Name"].AsString;
-            using var _ = Profiler.BeginEvent($"{nameof(GetMesh)} {mesh.ResourceName}");
             loadedResources[zippath].Add(mesh);
             if (totalVertexCount == 0)
                 return mesh;
