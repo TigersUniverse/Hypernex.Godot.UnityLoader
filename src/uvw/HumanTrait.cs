@@ -332,8 +332,8 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public static Quaternion SwingTwist(float x, float y, float z)
         {
-            var yz = float.Hypot(y, z);
-            // var yz = Mathf.Sqrt(y*y + z*z);
+            // var yz = float.Hypot(y, z);
+            var yz = Mathf.Sqrt(y*y + z*z);
             var sinc = Mathf.Abs(yz) < 1e-8f ? 0.5f : (Mathf.Sin(yz/2)/yz);
             var swingW = Mathf.Cos(yz/2);
             var twistW = Mathf.Cos(x/2);
