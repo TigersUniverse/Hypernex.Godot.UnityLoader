@@ -49,6 +49,15 @@ namespace Hypernex.GodotVersion.UnityLoader
                             Node other = reader.GetNodeById(spawn["m_PathID"].AsLong);
                             paths.Add("../" + node.GetPathTo(other));
                         }
+                        foreach (var scr in component["LocalScripts.Array"])
+                        {
+                            WorldScript wScript = new WorldScript();
+                            wScript.Name = scr["Name"].AsString;
+                            wScript.Language = (NexboxLanguage)scr["Language"].AsInt;
+                            wScript.Contents = scr["Script"].AsString;
+                            node.components.Add(wScript);
+                            node.AddChild(wScript, true);
+                        }
                         world.StartPositions = paths.ToArray();
                         return world;
                     }
@@ -108,6 +117,45 @@ namespace Hypernex.GodotVersion.UnityLoader
                             return mirror;
                         }
                         return null;
+                    }
+                    case "Hypernex.CCK.Unity.LocalScript":
+                    {
+                        WorldScript script = new WorldScript();
+                        script.Name = component["NexboxScript.Name"].AsString;
+                        script.Language = (NexboxLanguage)component["NexboxScript.Language"].AsInt;
+                        script.Contents = component["NexboxScript.Script"].AsString;
+                        return script;
+                    }
+                    case "Hypernex.CCK.Unity.VideoPlayerDescriptor":
+                    {
+                        VideoPlayer vid = new VideoPlayer();
+                        foreach (var item in component["VideoOutputs.Array"])
+                        {
+                            var info = manager.GetExtAsset(fileInst, item);
+                            if (info.info == null)
+                                continue;
+                            HolderNode other = reader.GetNodeById(info.baseField["m_GameObject.m_PathID"].AsLong);
+                        }
+                        var audioInfo = manager.GetExtAsset(fileInst, component["AudioOutput"]);
+                        if (audioInfo.info != null)
+                        {
+                            HolderNode other = reader.GetNodeById(audioInfo.baseField["m_PathID"].AsLong);
+                            if (GodotObject.IsInstanceValid(other))
+                            {
+                                vid.audioPlayer3d = "../" + node.GetPathTo(other);
+                            }
+                        }
+                        return vid;
+                    }
+                    case "TMPro.TextMeshPro":
+                    {
+                        Label3D label = new Label3D();
+                        label.Visible = component["m_Enabled"].AsBool;
+                        label.Modulate = BundleReader.GetColor(component["m_fontColor"]);
+                        label.Text = component["m_text"].AsString;
+                        label.PixelSize = 0.1f;
+                        label.FontSize = Mathf.RoundToInt(component["m_fontSize"].AsFloat);
+                        return label;
                     }
                 }
                 return null;

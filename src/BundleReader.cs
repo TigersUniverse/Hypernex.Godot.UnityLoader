@@ -264,7 +264,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 {
                     node.components.Add(comp);
                     if (!root.IsAncestorOf(comp))
-                        node.AddChild(comp);
+                        node.AddChild(comp, true);
                     comp.Owner = root;
                 }
                 return;
@@ -277,6 +277,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             switch (componentType)
             {
                 case AssetClassID.Transform:
+                case AssetClassID.RectTransform:
                 case AssetClassID.Animator:
                 case AssetClassID.MeshFilter:
                 case AssetClassID.SkinnedMeshRenderer:
@@ -297,6 +298,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             switch (componentType)
             {
                 case AssetClassID.Transform:
+                case AssetClassID.RectTransform:
                 {
                     node.assetTransformField = componentExtInfo;
                     node.fileId = componentPtr["m_PathID"].AsLong;
@@ -309,6 +311,11 @@ namespace Hypernex.GodotVersion.UnityLoader
                     node.Position = position;
                     node.Quaternion = rotation;
                     node.Scale = scale;
+                    if (componentType == AssetClassID.RectTransform)
+                    {
+                        var ancPosition = GetVector2(compBase["m_AnchoredPosition"]);
+                        node.Position += node.Quaternion * new Vector3(ancPosition.X, ancPosition.Y, 0f);
+                    }
                     break;
                 }
                 case AssetClassID.Animator:
@@ -698,6 +705,11 @@ namespace Hypernex.GodotVersion.UnityLoader
         public static Vector3 GetVector3NoFlip(AssetTypeValueField field)
         {
             return new Vector3(field["x"].AsFloat, field["y"].AsFloat, field["z"].AsFloat);
+        }
+
+        public static Color GetColor(AssetTypeValueField field)
+        {
+            return new Color(field["r"].AsFloat, field["g"].AsFloat, field["b"].AsFloat, field["a"].AsFloat);
         }
 
         public static Quaternion GetQuaternion(AssetTypeValueField field)
@@ -1452,7 +1464,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 }
             }
             Image img = Image.CreateFromData(file.m_Width, file.m_Height, false, Image.Format.Rgba8, data);
-            // img.Resize(512, 512, Image.Interpolation.Nearest);
+            img.Resize(512, 512, Image.Interpolation.Nearest);
             img.GenerateMipmaps();
             return img;
         }

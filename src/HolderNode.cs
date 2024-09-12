@@ -3,10 +3,11 @@ using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using Godot;
 using Godot.Collections;
+using Hypernex.Game;
 
 namespace Hypernex.GodotVersion.UnityLoader
 {
-    public partial class HolderNode : Node3D
+    public partial class HolderNode : Node3D, IEntity
     {
         [Export]
         public bool hasSetup = false;
@@ -62,6 +63,16 @@ namespace Hypernex.GodotVersion.UnityLoader
         public float avatarScale = 1f;
 
         public HolderNode Parent => GetParentOrNull<HolderNode>();
+
+        public bool Enabled
+        {
+            get => CanProcess();
+            set
+            {
+                Visible = value;
+                ProcessMode = value ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+            }
+        }
 
         public void GetTransformPath(Node3D src, NodePath path, Array<Transform3D> xforms)
         {
@@ -363,6 +374,16 @@ namespace Hypernex.GodotVersion.UnityLoader
                 AddChild(skel);
                 */
             }
+        }
+
+        public Node GetComponent(System.Type type)
+        {
+            return components.FirstOrDefault(x => x.GetType().IsAssignableTo(type));
+        }
+
+        public Node[] GetComponents(System.Type type)
+        {
+            return components.Where(x => x.GetType().IsAssignableTo(type)).ToArray();
         }
 
         public T GetComponent<T>() where T : Node
