@@ -126,6 +126,14 @@ namespace Hypernex.GodotVersion.UnityLoader
                         script.Contents = component["NexboxScript.Script"].AsString;
                         return script;
                     }
+                    case "Hypernex.CCK.Unity.NetworkSyncDescriptor":
+                    {
+                        NetworkSyncDescriptor script = new NetworkSyncDescriptor();
+                        script.InstanceHostOnly = component["InstanceHostOnly"].AsBool;
+                        script.CanSteal = component["CanSteal"].AsBool;
+                        script.AlwaysSync = component["AlwaysSync"].AsBool;
+                        return script;
+                    }
                     case "Hypernex.CCK.Unity.VideoPlayerDescriptor":
                     {
                         VideoPlayer vid = new VideoPlayer();
