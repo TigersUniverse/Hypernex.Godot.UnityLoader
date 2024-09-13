@@ -374,26 +374,39 @@ namespace Hypernex.GodotVersion.UnityLoader
                 AddChild(skel);
                 */
             }
+
+            foreach (var comp in components)
+            {
+                comp.SetMeta(IEntity.TypeName, this);
+            }
+        }
+
+        public Node AddComponent(Node value)
+        {
+            components.Add(value);
+            // AddChild(value, true);
+            value.SetMeta(IEntity.TypeName, this);
+            return value;
         }
 
         public Node GetComponent(System.Type type)
         {
-            return components.FirstOrDefault(x => x.GetType().IsAssignableTo(type));
+            return components.FirstOrDefault(x => IsInstanceValid(x) && x.GetType().IsAssignableTo(type));
         }
 
         public Node[] GetComponents(System.Type type)
         {
-            return components.Where(x => x.GetType().IsAssignableTo(type)).ToArray();
+            return components.Where(x => IsInstanceValid(x) && x.GetType().IsAssignableTo(type)).ToArray();
         }
 
         public T GetComponent<T>() where T : Node
         {
-            return components.FirstOrDefault(x => x is T) as T;
+            return components.FirstOrDefault(x => IsInstanceValid(x) && x is T) as T;
         }
 
         public T[] GetComponents<T>() where T : Node
         {
-            return components.Where(x => x is T).Select(x => x as T).ToArray();
+            return components.Where(x => IsInstanceValid(x) && x is T).Select(x => x as T).ToArray();
         }
 
         public HolderNode FindChildTransform(string name)
@@ -404,6 +417,14 @@ namespace Hypernex.GodotVersion.UnityLoader
         public HolderNode FindChildTransform(string name, string parentName)
         {
             return FindChildren("*", owned: false).FirstOrDefault(x => x is HolderNode && x.Name == name.ValidateNodeName() && x.GetParent().Name == parentName.ValidateNodeName()) as HolderNode;
+        }
+
+        public override void _EnterTree()
+        {
+            foreach (var comp in components)
+            {
+                comp.SetMeta(IEntity.TypeName, this);
+            }
         }
 
         public override void _Ready()

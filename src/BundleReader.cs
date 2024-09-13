@@ -9,6 +9,7 @@ using AssetsTools.NET.Texture;
 using Fmod5Sharp;
 using Godot;
 using Hypernex.CCK.GodotVersion;
+using Hypernex.Game;
 
 namespace Hypernex.GodotVersion.UnityLoader
 {
@@ -263,6 +264,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 if (GodotObject.IsInstanceValid(comp))
                 {
                     node.components.Add(comp);
+                    comp.SetMeta(IEntity.TypeName, node);
                     if (!root.IsAncestorOf(comp))
                         node.AddChild(comp, true);
                     comp.Owner = root;
@@ -533,6 +535,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     if (GodotObject.IsInstanceValid(light))
                     {
                         node.AddChild(light);
+                        light.SetMeta(IEntity.TypeName, node);
                         node.components.Add(light);
                     }
                     break;
@@ -547,6 +550,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     probe.Size = GetVector3NoFlip(compBase["m_BoxSize"]);
                     probe.MaxDistance = probe.Size.Length() * 2f;
                     node.AddChild(probe);
+                    probe.SetMeta(IEntity.TypeName, node);
                     node.components.Add(probe);
                     break;
                 }

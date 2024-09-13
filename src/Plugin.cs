@@ -7,6 +7,7 @@ using Godot;
 using Hypernex.CCK;
 using Hypernex.CCK.GodotVersion;
 using Hypernex.CCK.GodotVersion.Classes;
+using Hypernex.Game;
 
 namespace Hypernex.GodotVersion.UnityLoader
 {
@@ -55,7 +56,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                             wScript.Name = scr["Name"].AsString;
                             wScript.Language = (NexboxLanguage)scr["Language"].AsInt;
                             wScript.Contents = scr["Script"].AsString;
-                            node.components.Add(wScript);
+                            node.AddComponent(wScript);
                             node.AddChild(wScript, true);
                         }
                         world.StartPositions = paths.ToArray();
