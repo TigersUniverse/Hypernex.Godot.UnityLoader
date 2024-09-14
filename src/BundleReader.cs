@@ -220,6 +220,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 ParseAssetsFileInstance(mgr, aFile);
                 scene = new PackedScene();
                 scene.Pack(root);
+                root.Free();
                 mgr.UnloadAll(true);
                 return;
             }
@@ -238,6 +239,7 @@ namespace Hypernex.GodotVersion.UnityLoader
             }
             scene = new PackedScene();
             scene.Pack(root);
+            root.Free();
             mgr.UnloadAll(true);
         }
 
@@ -263,10 +265,11 @@ namespace Hypernex.GodotVersion.UnityLoader
                 Node comp = typeMappings?.Invoke(this, monoScript.baseField["m_Namespace"].AsString + '.' + monoScript.baseField["m_ClassName"].AsString, node, manager, fileInst, compBase);
                 if (GodotObject.IsInstanceValid(comp))
                 {
-                    node.components.Add(comp);
-                    comp.SetMeta(IEntity.TypeName, node);
+                    // node.components.Add(comp);
+                    // comp.SetMeta(IEntity.TypeName, node);
                     if (!root.IsAncestorOf(comp))
                         node.AddChild(comp, true);
+                    node.AddComponent(comp);
                     comp.Owner = root;
                 }
                 return;
@@ -535,8 +538,9 @@ namespace Hypernex.GodotVersion.UnityLoader
                     if (GodotObject.IsInstanceValid(light))
                     {
                         node.AddChild(light);
-                        light.SetMeta(IEntity.TypeName, node);
-                        node.components.Add(light);
+                        node.AddComponent(light);
+                        // light.SetMeta(IEntity.TypeName, node);
+                        // node.components.Add(light);
                     }
                     break;
                 }
@@ -550,8 +554,9 @@ namespace Hypernex.GodotVersion.UnityLoader
                     probe.Size = GetVector3NoFlip(compBase["m_BoxSize"]);
                     probe.MaxDistance = probe.Size.Length() * 2f;
                     node.AddChild(probe);
-                    probe.SetMeta(IEntity.TypeName, node);
-                    node.components.Add(probe);
+                    node.AddComponent(probe);
+                    // probe.SetMeta(IEntity.TypeName, node);
+                    // node.components.Add(probe);
                     break;
                 }
                 case AssetClassID.Rigidbody:

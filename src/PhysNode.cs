@@ -1,4 +1,5 @@
 using Godot;
+using Hypernex.Game;
 
 namespace Hypernex.GodotVersion.UnityLoader
 {

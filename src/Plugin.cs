@@ -56,8 +56,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                             wScript.Name = scr["Name"].AsString;
                             wScript.Language = (NexboxLanguage)scr["Language"].AsInt;
                             wScript.Contents = scr["Script"].AsString;
-                            node.AddComponent(wScript);
                             node.AddChild(wScript, true);
+                            node.AddComponent(wScript);
                         }
                         world.StartPositions = paths.ToArray();
                         return world;
@@ -94,15 +94,17 @@ namespace Hypernex.GodotVersion.UnityLoader
                     {
                         var desc = new GrabbableDescriptor();
                         // TODO: properties
-                        node.GetComponent<RigidBody3D>()?.AddChild(desc);
-                        return desc;
+                        node.GetComponent<RigidBody3D>()?.AddChild(desc, true);
+                        node.AddComponent(desc);
+                        return null;
                     }
                     case "Hypernex.CCK.Unity.RespawnableDescriptor":
                     {
                         var desc = new RespawnableDescriptor();
                         desc.LowestPointRespawnThreshold = component["LowestPointRespawnThreshold"].AsFloat;
-                        node.GetComponent<RigidBody3D>()?.AddChild(desc);
-                        return desc;
+                        node.GetComponent<RigidBody3D>()?.AddChild(desc, true);
+                        node.AddComponent(desc);
+                        return null;
                     }
                     case "kTools.Mirrors.Mirror":
                     {
