@@ -12,15 +12,10 @@ namespace Hypernex.GodotVersion.UnityLoader
     {
         public AnimationPlayer GetAnimPlayer(AssetsFileInstance fileInst, AssetTypeValueField animatorfield, HolderNode node)
         {
-            var ctrlPtr = animatorfield["m_Controller"];
-            var ctrlAsset = mgr.GetExtAsset(fileInst, ctrlPtr);
-            if (ctrlAsset.info == null)
-                return null;
             var avatarPtr = animatorfield["m_Avatar"];
             var avatarAsset = mgr.GetExtAsset(fileInst, avatarPtr);
             if (avatarAsset.info == null)
                 return null;
-
             Dictionary<HashNum, long> hashToXform = new Dictionary<HashNum, long>();
             BuildTOS(hashToXform, node.assetTransformField);
             Dictionary<HashNum, HolderNode> hashToNode = new Dictionary<HashNum, HolderNode>();
@@ -30,20 +25,19 @@ namespace Hypernex.GodotVersion.UnityLoader
                 node.hashToNodePath.TryAdd(kvp.Key, node.GetPathTo(target));
                 hashToNode.TryAdd(kvp.Key, target);
             }
-            foreach (var item in avatarAsset.baseField["m_TOS.Array"])
-            {
-                break;
-                var first = item["first"].AsUInt;
-                var second = item["second"].AsString;
-                var path = string.Join("/", second.Split("/").Select(x => x.ValidateNodeName()));
-                hashToNode.TryAdd(first, node.GetNode<HolderNode>(path));
-                node.hashToNodePath.TryAdd(first, path);
-            }
             AnimationPlayer player = new AnimationPlayer();
-            AnimationLibrary library = GetAnimationLibrary(ctrlAsset, hashToNode, node);
-            Error err = player.AddAnimationLibrary(string.Empty, library);
-            if (err != Error.Ok)
-                GD.PrintErr(err);
+            var ctrlPtr = animatorfield["m_Controller"];
+            var ctrlAsset = mgr.GetExtAsset(fileInst, ctrlPtr);
+            if (ctrlAsset.info == null)
+            {
+            }
+            else
+            {
+                AnimationLibrary library = GetAnimationLibrary(ctrlAsset, hashToNode, node);
+                Error err = player.AddAnimationLibrary(string.Empty, library);
+                if (err != Error.Ok)
+                    GD.PrintErr(err);
+            }
             ParseHumanAvatarData(avatarAsset, hashToNode, node);
             return player;
         }
@@ -174,7 +168,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                     axes.position = GetVector3(human2SkeletonPose[i]["t"]);
                     axes.rotation = GetQuaternion(human2SkeletonPose[i]["q"]);
                     axes.scale = GetVector3NoFlip(human2SkeletonPose[i]["s"]);
-                    node.boneToNode.TryAdd(hashToNode[data].Name, path);
+                    if (!node.boneToNode.Values.Contains(path))
+                        node.boneToNode.TryAdd(hashToNode[data].Name, path);
                 }
             }
         }
@@ -209,10 +204,16 @@ namespace Hypernex.GodotVersion.UnityLoader
 
             foreach (var bind in genericBinds)
             {
-                var key = GetBindKey(bind["path"].AsUInt, bind["typeID"].AsInt, bind["customType"].AsByte);
-                if (!hashToNode.ContainsKey(bind["path"].AsUInt))
+                var customType = bind["customType"].AsByte;
+                var path = bind["path"].AsUInt;
+                var typeId = bind["typeID"].AsInt;
+                var key = GetBindKey(path, typeId, customType);
+                if (!hashToNode.ContainsKey(path))
+                {
+                    // GD.PrintErr($"Node not found {path} {typeId} {customType}");
                     continue;
-                var target = hashToNode[bind["path"].AsUInt];
+                }
+                var target = hashToNode[path];
                 binders.TryAdd(key, target);
             }
 
@@ -228,7 +229,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 AssetClassID typeName = (AssetClassID)typeId;
                 if (!binders.ContainsKey(key))
                 {
-                    GD.PrintErr($"Key not found: {key} ({path} {typeId} {customType})");
+                    // GD.PrintErr($"Key not found: {key} ({path} {typeId} {customType})");
                     offset += typeId == 4 ? (uint)(attribute == 2 ? 4 : 3) : 1;
                     continue;
                 }

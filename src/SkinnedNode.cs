@@ -21,17 +21,37 @@ namespace Hypernex.GodotVersion.UnityLoader
         {
             if (IsInstanceValid(anim) && !anim.IsPlaying())
             {
-                anim.Play(anim.GetAnimationList().First());
+                // anim.Play(anim.GetAnimationList().First());
+            }
+            foreach (var rootPath in parent.rootBonePaths)
+            {
+                var root = GetNodeOrNull<Node3D>(rootPath);
+                if (IsInstanceValid(root))
+                {
+                    root.Position = parent.rootBonePosition * new Vector3(1f, 1f, BundleReader.zFlipper);
+                    root.Quaternion = HumanTrait.FlipZ(parent.rootBoneRotation);
+                    if (!parent.rootBoneScale.IsZeroApprox())
+                        root.Scale = parent.rootBoneScale;
+                }
             }
             foreach (var skel in skels)
             {
                 if (IsInstanceValid(skel))
                 {
-                    if (IsInstanceValid(anim))
+                    if (IsInstanceValid(anim) || parent.rootBonePaths.Count != 0)
                     {
+                        skel.TopLevel = true;
+                        parent.Transform = skel.Transform;
+                        // parent.Position = skel.Position;
+                        // parent.Rotation = skel.Rotation + new Vector3(0f, Mathf.DegToRad(180f), 0f);
+                        // parent.Scale = skel.Scale;
                         foreach (var kvp in parent.humanBoneAxes)
                         {
+                            if (string.IsNullOrEmpty(kvp.Value.humanBoneName))
+                                continue;
                             var bone = parent.GetNode<HolderNode>(kvp.Key);
+                            if (bone == parent)
+                                continue;
                             int idx = skel.FindBone(kvp.Value.humanBoneName);
                             if (idx != -1)
                             {
@@ -55,6 +75,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     }
                 }
             }
+            // return;
             foreach (var rootPath in parent.rootBonePaths)
             {
                 var root = GetNodeOrNull<Node3D>(rootPath);
@@ -66,6 +87,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                         root.Scale = parent.rootBoneScale;
                 }
             }
+            return;
             if (IsInstanceValid(anim))
             {
                 // System.Array.Fill(muscles, 0f);

@@ -22,7 +22,7 @@ namespace Hypernex.GodotVersion.UnityLoader
         public override void OnPluginLoaded()
         {
             Init.WorldProvider = UnitySceneProvider;
-            // Init.AvatarProvider = UnitySceneProvider;
+            Init.AvatarProvider = UnitySceneProvider;
         }
 
         private IntPtr TracyResolver(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
@@ -65,6 +65,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     case "Hypernex.CCK.Unity.Avatar":
                     {
                         var avi = new AvatarDescriptor();
+                        avi.Name = nameof(AvatarDescriptor);
                         foreach (var anims in component["Animators.Array"])
                         {
                             var animCtrl = manager.GetExtAsset(fileInst, anims["AnimatorController"]);
@@ -81,8 +82,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                         {
                             return null;
                         }
-                        var eyes = new Node3D();
-                        node.AddChild(eyes);
+                        // var eyes = new Node3D();
+                        // node.AddChild(eyes);
                         avi.Skeleton = "../" + node.GetPathTo(skel);
                         // avi.Eyes = "../" + node.GetPathTo(eyes);
                         var xform = HolderNode.GetTransformGlobal(skel);

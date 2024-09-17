@@ -358,10 +358,12 @@ namespace Hypernex.GodotVersion.UnityLoader
             {
                 muscles = new float[HumanTrait.MuscleName.Length];
                 AnimationPlayer tree = reader.GetAnimPlayer(assetAnimatorField.file, assetAnimatorField.baseField, this);
-                // components.Add(tree);
-                AddChild(tree);
-                AddComponent(tree);
-                /*
+                if (IsInstanceValid(tree))
+                {
+                    AddChild(tree);
+                    AddComponent(tree);
+                }
+                // /*
                 Skeleton3D skel = new Skeleton3D();
                 Dictionary<HolderNode, int> indexes = new Dictionary<HolderNode, int>();
                 foreach (var boneKvp in hashToNode)
@@ -372,18 +374,27 @@ namespace Hypernex.GodotVersion.UnityLoader
                     indexes.Add(boneKvp.Value, idx);
                     if (IsInstanceValid(boneKvp.Value.Parent) && indexes.ContainsKey(boneKvp.Value.Parent))
                         skel.SetBoneParent(idx, indexes[boneKvp.Value.Parent]);
+                    skel.SetBoneRest(idx, boneKvp.Value.Transform);
                 }
-                foreach (var kvp in boneToNode)
+                foreach (var kvp in humanBoneAxes)
                 {
-                    var bone = GetNode<HolderNode>(kvp.Value);
-                    if (indexes.ContainsKey(bone) && !string.IsNullOrEmpty(kvp.Key))
+                    var bone = GetNode<HolderNode>(kvp.Key);
+                    if (indexes.ContainsKey(bone) && !string.IsNullOrEmpty(kvp.Value.humanBoneName))
                     {
-                        skel.SetBoneName(indexes[bone], kvp.Key);
+                        GD.PrintS(bone.Name, kvp.Key, kvp.Value.humanBoneName);
+                        skel.SetBoneName(indexes[bone], kvp.Value.humanBoneName);
                     }
                 }
-                components.Add(skel);
                 AddChild(skel);
-                */
+                AddComponent(skel);
+                // */
+            }
+            var anim = this.GetComponent<AnimationPlayer>();
+            if (IsInstanceValid(anim) || this.GetComponents<Skeleton3D>().Length != 0 || rootBonePaths.Count != 0)
+            {
+                var skin = new SkinnedNode();
+                AddChild(skin);
+                AddComponent(skin);
             }
         }
 
@@ -444,11 +455,15 @@ namespace Hypernex.GodotVersion.UnityLoader
                 if (comp.HasMeta("audio_loop") && comp.GetMeta("audio_loop").AsBool())
                     comp.Finished += () => comp.Play();
             }
+            /*
             var anim = this.GetComponent<AnimationPlayer>();
             if (IsInstanceValid(anim) || this.GetComponents<Skeleton3D>().Length != 0 || rootBonePaths.Count != 0)
             {
-                AddChild(new SkinnedNode());
+                var skin = new SkinnedNode();
+                AddChild(skin);
+                AddComponent(skin);
             }
+            */
             foreach (var probe in this.GetComponents<ReflectionProbe>())
             {
                 probe.GlobalBasis = Basis.Identity;

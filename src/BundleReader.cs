@@ -137,9 +137,21 @@ namespace Hypernex.GodotVersion.UnityLoader
                     env.Sky.SkyMaterial = GetSkyMaterial(zippath, mgr, skyboxMatInfo.file, skyboxMatInfo.baseField);
                 else
                     env.Sky.SkyMaterial = new ProceduralSkyMaterial();
+                env.FogEnabled = baseField["m_Fog"].AsBool;
+                env.FogLightColor = GetColor(baseField["m_FogColor"]);
+                switch (baseField["m_FogMode"].AsInt)
+                {
+                    case 1:
+                        env.FogMode = Godot.Environment.FogModeEnum.Depth;
+                        env.FogDepthBegin = baseField["m_LinearFogStart"].AsFloat;
+                        env.FogDepthEnd = baseField["m_LinearFogEnd"].AsFloat;
+                        break;
+                }
+                // env.FogDensity
                 var worldEnv = new WorldEnvironment();
                 worldEnv.Environment = env;
-                root.AddChild(worldEnv);
+                root.AddChild(worldEnv, true);
+                break;
             }
             var nodesList = new List<HolderNode>(nodes);
             allNodes = new List<HolderNode>(nodes);
@@ -305,6 +317,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 case AssetClassID.Transform:
                 case AssetClassID.RectTransform:
                 {
+                    componentExtInfo.baseField = compBase;
                     node.assetTransformField = componentExtInfo;
                     node.fileId = componentPtr["m_PathID"].AsLong;
                     node.gameObjectFileId = compBase["m_GameObject"]["m_PathID"].AsLong;
@@ -325,6 +338,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 }
                 case AssetClassID.Animator:
                 {
+                    componentExtInfo.baseField = compBase;
                     node.assetAnimatorField = componentExtInfo;
                     break;
                 }
@@ -918,6 +932,20 @@ namespace Hypernex.GodotVersion.UnityLoader
             Godot.Collections.Array<Image> imgs = new Godot.Collections.Array<Image>();
             imgs.Resize(6);
             Color tint = Colors.White;
+            float exposure = 1f;
+            bool cubemap = false;
+            foreach (var flKvp in field["m_SavedProperties.m_Floats.Array"])
+            {
+                var propName = flKvp["first"].AsString;
+                var fl = flKvp["second"].AsFloat;
+                switch (propName)
+                {
+                    case "_Exposure":
+                        exposure = fl;
+                        cubemap = true;
+                        break;
+                }
+            }
             foreach (var colKvp in field["m_SavedProperties.m_Colors.Array"])
             {
                 var propName = colKvp["first"].AsString;
@@ -934,6 +962,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                         break;
                 }
             }
+            tint *= exposure;
             foreach (var texKvp in field["m_SavedProperties.m_TexEnvs.Array"])
             {
                 var propName = texKvp["first"].AsString;
@@ -949,6 +978,9 @@ namespace Hypernex.GodotVersion.UnityLoader
                 var offset = GetVector2(texKvp["second.m_Offset"]);
                 switch (propName)
                 {
+                    case "_Tex":
+                        cubemap = true;
+                        break;
                     case "_UpTex":
                         imgs[2] = texture;
                         texture.FlipY();
@@ -989,7 +1021,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     imgs[i].Fill(Colors.Gray);
                 }
             }
-            if (nulls == 6)
+            if (nulls == 6 && !cubemap)
             {
                 var m = new ProceduralSkyMaterial();
                 m.ResourceName = field["m_Name"].AsString;
@@ -1044,7 +1076,10 @@ namespace Hypernex.GodotVersion.UnityLoader
                     if (val.Equals("Opaque", StringComparison.OrdinalIgnoreCase))
                         material.Transparency = BaseMaterial3D.TransparencyEnum.Disabled;
                     else
+                    {
                         material.Transparency = BaseMaterial3D.TransparencyEnum.AlphaDepthPrePass;
+                        // material.BlendMode = BaseMaterial3D.BlendModeEnum.PremultAlpha;
+                    }
                 }
             }
             int roughnessTextureSource = 0;
@@ -1065,6 +1100,23 @@ namespace Hypernex.GodotVersion.UnityLoader
                         break;
                     case "_SmoothnessTextureChannel":
                         roughnessTextureSource = Mathf.RoundToInt(fl);
+                        break;
+                    case "_Blend":
+                        switch ((int)fl)
+                        {
+                            case 0:
+                                material.BlendMode = BaseMaterial3D.BlendModeEnum.Mix;
+                                break;
+                            case 1:
+                                material.BlendMode = BaseMaterial3D.BlendModeEnum.PremultAlpha;
+                                break;
+                            case 2:
+                                material.BlendMode = BaseMaterial3D.BlendModeEnum.Add;
+                                break;
+                            case 3:
+                                material.BlendMode = BaseMaterial3D.BlendModeEnum.Mul;
+                                break;
+                        }
                         break;
                 }
             }
@@ -1489,7 +1541,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                 byte b = data[i+2];
                 byte a = data[i+3];
                 data[i] = a;
-                data[i+1] = g;
+                data[i+1] = (byte)(byte.MaxValue - g);
                 data[i+2] = b;
                 data[i+3] = r;
             }
