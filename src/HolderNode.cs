@@ -296,6 +296,12 @@ namespace Hypernex.GodotVersion.UnityLoader
 
                     AddChild(skel, true);
                     skel.AddChild(meshInst, true);
+                    var parentSkel = Parent.GetComponent<Skeleton3D>();
+                    SkeletonMapper mapper = new SkeletonMapper();
+                    skel.AddChild(mapper, true);
+                    mapper.target = mapper.GetPathTo(Parent);
+                    // meshInst.Transform = Transform;
+                    // parentSkel.AddChild(meshInst, true);
                     meshInst.Skin = skel.CreateSkinFromRestTransforms();
                     meshInst.Skeleton = meshInst.GetPathTo(skel);
                     if (IsInstanceValid(Parent.GetComponent<AnimationPlayer>()))
@@ -375,6 +381,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     if (IsInstanceValid(boneKvp.Value.Parent) && indexes.ContainsKey(boneKvp.Value.Parent))
                         skel.SetBoneParent(idx, indexes[boneKvp.Value.Parent]);
                     skel.SetBoneRest(idx, boneKvp.Value.Transform);
+                    skel.SetBonePose(idx, boneKvp.Value.Transform);
                 }
                 foreach (var kvp in humanBoneAxes)
                 {

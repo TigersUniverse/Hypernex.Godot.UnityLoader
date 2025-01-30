@@ -64,7 +64,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                             }
                         }
                     }
-                    else
+                    // else
                     {
                         foreach (var kvp in parent.skeletonBoneMap)
                         {
