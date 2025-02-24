@@ -64,6 +64,15 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public HolderNode Parent => GetParentOrNull<HolderNode>();
 
+        public IEntity ParentEnt => Parent;
+        public IEntity[] GetChildEnts() => null;
+
+        string IEntity.Name
+        {
+            get => Name;
+            set => Name = value;
+        }
+
         public bool Enabled
         {
             get => CanProcess();

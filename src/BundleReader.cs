@@ -66,10 +66,10 @@ namespace Hypernex.GodotVersion.UnityLoader
             mgr = null;
             if (loadedResources.TryGetValue(zippath, out var resources))
             {
-                foreach (var res in resources)
+                // foreach (var res in resources)
                 {
-                    if (res is Mesh || res is Texture || res is Shader || res is Material || res is Image)
-                        RenderingServer.FreeRid(res.GetRid());
+                    // if (res is Mesh || res is Texture || res is Shader || res is Material || res is Image)
+                        // RenderingServer.FreeRid(res.GetRid());
                 }
                 resources.Clear();
                 loadedResources.Remove(zippath);
@@ -1581,8 +1581,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                 byte b = data[i+2];
                 byte a = data[i+3];
                 data[i] = (byte)(byte.MaxValue - r);
-                data[i+1] = g;
-                data[i+2] = b;
+                data[i+1] = (byte)(byte.MaxValue - g);
+                data[i+2] = (byte)(byte.MaxValue - b);
                 data[i+3] = (byte)(byte.MaxValue - a);
             }
             Image img2 = Image.CreateFromData(img.GetWidth(), img.GetHeight(), true, Image.Format.Rgba8, data);

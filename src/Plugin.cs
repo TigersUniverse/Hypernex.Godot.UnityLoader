@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using AssetsTools.NET.Extra;
 using Godot;
 using Hypernex.CCK;
 using Hypernex.CCK.GodotVersion;
@@ -19,19 +20,30 @@ namespace Hypernex.GodotVersion.UnityLoader
 
         public override string PluginVersion => "0.0.0.0";
 
+        public static AssetsManager mgr;
+
         public override void OnPluginLoaded()
         {
-            Init.WorldProvider = UnitySceneProvider;
-            Init.AvatarProvider = UnitySceneProvider;
+            mgr = new AssetsManager();
+            mgr.UseQuickLookup = true;
+            mgr.UseTemplateFieldCache = true;
+            mgr.UseMonoTemplateFieldCache = true;
+            mgr.UseRefTypeManagerCache = true;
+            Init.WorldProviders.TryAdd(CanLoad, UnitySceneProvider);
+            Init.AvatarProviders.TryAdd(CanLoad, UnitySceneProvider);
         }
 
-        private IntPtr TracyResolver(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
+        public static bool CanLoad(string filePath)
         {
-            if (libraryName.Equals("TracyClient"))
+            try
             {
-                return NativeLibrary.Load(Path.GetFullPath(Path.Combine(assembly.Location, "..", "runtimes", libraryName)));
+                var data = mgr.LoadBundleFile(filePath, false);
+                return data != null;
             }
-            return IntPtr.Zero;
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         public ISceneProvider UnitySceneProvider()
@@ -124,6 +136,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     }
                     case "Hypernex.CCK.Unity.LocalScript":
                     {
+                        break;
                         WorldScript script = new WorldScript();
                         script.Name = component["NexboxScript.Name"].AsString;
                         script.Language = (NexboxLanguage)component["NexboxScript.Language"].AsInt;
@@ -140,6 +153,7 @@ namespace Hypernex.GodotVersion.UnityLoader
                     }
                     case "Hypernex.CCK.Unity.VideoPlayerDescriptor":
                     {
+                        break;
                         VideoPlayer vid = new VideoPlayer();
                         foreach (var item in component["VideoOutputs.Array"])
                         {
@@ -154,7 +168,8 @@ namespace Hypernex.GodotVersion.UnityLoader
                             HolderNode other = reader.GetNodeById(audioInfo.baseField["m_PathID"].AsLong);
                             if (GodotObject.IsInstanceValid(other))
                             {
-                                vid.audioPlayer3d = "../" + node.GetPathTo(other);
+                                vid.AudioPlayback = "../" + node.GetPathTo(other);
+                                // vid.audioPlayer3d = "../" + node.GetPathTo(other);
                             }
                         }
                         return vid;

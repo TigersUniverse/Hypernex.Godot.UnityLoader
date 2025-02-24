@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hypernex.Godot.UnityLoader", "Hypernex.Godot.UnityLoader.csproj", "{74ECF719-65BD-4425-92FD-6724052FBA49}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hypernex.Godot.UnityLoader", "src\Hypernex.Godot.UnityLoader.csproj", "{DEBB4B50-A7A9-449C-A7DB-276AAE7765B2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test", "test\test.csproj", "{F66CA3F7-ADCC-4681-A8F2-8BDAB0AA8319}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,9 +16,13 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{74ECF719-65BD-4425-92FD-6724052FBA49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{74ECF719-65BD-4425-92FD-6724052FBA49}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{74ECF719-65BD-4425-92FD-6724052FBA49}.Release|Any CPU.ActiveCfg = Debug|Any CPU
-		{74ECF719-65BD-4425-92FD-6724052FBA49}.Release|Any CPU.Build.0 = Debug|Any CPU
+		{DEBB4B50-A7A9-449C-A7DB-276AAE7765B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DEBB4B50-A7A9-449C-A7DB-276AAE7765B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DEBB4B50-A7A9-449C-A7DB-276AAE7765B2}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{DEBB4B50-A7A9-449C-A7DB-276AAE7765B2}.Release|Any CPU.Build.0 = Debug|Any CPU
+		{F66CA3F7-ADCC-4681-A8F2-8BDAB0AA8319}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F66CA3F7-ADCC-4681-A8F2-8BDAB0AA8319}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F66CA3F7-ADCC-4681-A8F2-8BDAB0AA8319}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F66CA3F7-ADCC-4681-A8F2-8BDAB0AA8319}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
